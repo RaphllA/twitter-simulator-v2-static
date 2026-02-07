@@ -5,7 +5,7 @@
  * - 渲染 Timeline 和推文详情
  * - 点击编辑任意元素
  * - 头像/图片点击更换
- * - 数据持久化到 localStorage
+ * - 数据持久化到 IndexedDB（locale/sort 仍在 localStorage）
  */
 
 // ========================================
@@ -95,8 +95,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 迁移旧数据（如果有 base64 图片在 localStorage 中）
     await migrateOldImages();
 
-    renderTimeline();
+    const searchInput = document.querySelector('.search-box input');
+    if (searchInput) searchInput.value = '';
+    timelineSearchQuery = '';
+
+    const ui = getUIState();
+    const accounts = getAccounts();
+    const fallbackViewerId = ui.defaultAuthorId || accounts[0]?.id || null;
+    const fallbackComposeId = ui.composeAuthorId || fallbackViewerId;
+    if (fallbackViewerId && ui.defaultAuthorId !== fallbackViewerId) {
+        setDefaultAuthorId(fallbackViewerId);
+    }
+    if (fallbackComposeId && ui.composeAuthorId !== fallbackComposeId) {
+        setComposeAuthorId(fallbackComposeId);
+    }
+
     setupEventListeners();
+    renderTimeline();
 });
 
 // ========================================
@@ -317,6 +332,55 @@ function formatText(text) {
     return html;
 }
 
+function ti(key, vars = {}) {
+    let text = t(key);
+    Object.entries(vars).forEach(([name, value]) => {
+        text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value ?? ''));
+    });
+    return text;
+}
+
+function getDefaultTranslationSource() {
+    return getLocale() === 'ja-JP' ? '中国語' : '中文';
+}
+
+function getTukuyomiBrandHtml() {
+    return '<span class="tukuyomi-brand"><span class="t">t</span><span class="u">u</span><span class="k">k</span><span class="u2">u</span><span class="y">y</span><span class="o">o</span><span class="m">m</span><span class="i">i</span></span>';
+}
+
+function buildTranslationHeaderHtml(tweetId, source) {
+    const brand = getTukuyomiBrandHtml();
+    const sourceLabel = source || getDefaultTranslationSource();
+    if (getLocale() === 'ja-JP') {
+        return `${brand} が<span class="editable" data-tweet-id="${tweetId}" data-field="translationSource">${sourceLabel}</span>から翻訳`;
+    }
+    return `由 ${brand} 翻译自<span class="editable" data-tweet-id="${tweetId}" data-field="translationSource">${sourceLabel}</span>`;
+}
+
+function stripCardEditing(card) {
+    if (!card) return;
+    card.querySelector('.delete-btn')?.remove();
+    card.querySelectorAll('.translation-editor').forEach(node => node.remove());
+    card.querySelectorAll('.media-remove-btn').forEach(node => node.remove());
+    card.querySelectorAll('.editable, .editable-number, .editable-avatar, .editable-media').forEach(node => {
+        node.classList.remove('editable', 'editable-number', 'editable-avatar', 'editable-media');
+    });
+}
+
+function isGuideTweetById(tweetId) {
+    if (!Number.isFinite(tweetId)) return false;
+    return !!currentData.find(tw => tw.id === tweetId)?.isGuide;
+}
+
+function getTweetIdFromEditableTarget(target) {
+    if (!target) return NaN;
+    const direct = target.dataset?.tweetId;
+    if (direct) return parseInt(direct, 10);
+    const host = target.closest?.('[data-tweet-id]');
+    if (!host) return NaN;
+    return parseInt(host.dataset.tweetId, 10);
+}
+
 function createTweetCard(tweet, isDetail = false) {
     const card = document.createElement('div');
     card.className = isDetail ? 'tweet-detail' : 'tweet-card';
@@ -400,7 +464,7 @@ function createTweetCard(tweet, isDetail = false) {
             <div class="tweet-translation">
                 <div class="tweet-translation-header">
                     <svg class="translate-icon" viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
-                    <span>由 <span class="tukuyomi-brand"><span class="t">t</span><span class="u">u</span><span class="k">k</span><span class="u2">u</span><span class="y">y</span><span class="o">o</span><span class="m">m</span><span class="i">i</span></span> 翻译自<span class="editable" data-tweet-id="${tweet.id}" data-field="translationSource">${tweet.translation.source || '中文'}</span></span>
+                    <span>${buildTranslationHeaderHtml(tweet.id, tweet.translation.source)}</span>
                 </div>
                 <div class="tweet-translation-text editable" data-tweet-id="${tweet.id}" data-field="translationText">${formatText(tweet.translation.text)}</div>
             </div>
@@ -501,6 +565,10 @@ function createTweetCard(tweet, isDetail = false) {
                 </div>
             </div>
         `;
+    }
+
+    if (tweet.isGuide) {
+        stripCardEditing(card);
     }
 
     return card;
@@ -846,6 +914,9 @@ function createReplyCard(reply, tweetId) {
 function setupEventListeners() {
     // 点击可编辑文本
     document.addEventListener('click', async (e) => {
+        if (e.target.closest('a')) {
+            return;
+        }
         if (e.target.closest('.media-remove-btn') || e.target.closest('.translation-editor')) {
             e.stopPropagation();
             return;
@@ -855,12 +926,18 @@ function setupEventListeners() {
         const editableAvatar = e.target.closest('.editable-avatar');
 
         if (editable) {
+            const tweetId = getTweetIdFromEditableTarget(editable);
+            if (isGuideTweetById(tweetId)) return;
             e.stopPropagation();
             startTextEdit(editable);
         } else if (editableNumber) {
+            const tweetId = getTweetIdFromEditableTarget(editableNumber);
+            if (isGuideTweetById(tweetId)) return;
             e.stopPropagation();
             startNumberEdit(editableNumber);
         } else if (editableAvatar) {
+            const tweetId = getTweetIdFromEditableTarget(editableAvatar);
+            if (isGuideTweetById(tweetId)) return;
             e.stopPropagation();
             startAvatarEdit(editableAvatar);
         }
@@ -1184,7 +1261,7 @@ function startNumberEdit(element) {
     const replyId = element.dataset.replyId ? parseInt(element.dataset.replyId) : null;
 
     const currentValue = element.textContent.trim();
-    const newValue = prompt(`编辑 ${getFieldLabel(field)}:`, currentValue);
+    const newValue = prompt(ti('editFieldPrompt', { field: getFieldLabel(field) }), currentValue);
 
     if (newValue !== null) {
         if (tweetId === null) {
@@ -1254,7 +1331,7 @@ function openImageModal(multiple = false) {
 
     const syncWrap = document.getElementById('sync-account-avatar-option-wrap');
     const syncInput = document.getElementById('sync-account-avatar-option');
-    const showSyncOption = editingField === 'avatar' && editingTweetId !== null;
+    const showSyncOption = editingField === 'avatar' && editingTweetId !== null && editingReplyId === null;
     if (syncWrap) syncWrap.style.display = showSyncOption ? 'flex' : 'none';
     if (syncInput) syncInput.checked = false;
 }
@@ -1723,15 +1800,15 @@ function updateData(tweetId, replyId, field, value) {
                 reply.stats.views = parseNumber(value);
                 break;
             case 'translationText':
-                if (!reply.translation) reply.translation = { text: '', source: '中文', visible: true };
+                if (!reply.translation) reply.translation = { text: '', source: getDefaultTranslationSource(), visible: true };
                 reply.translation.text = value;
                 break;
             case 'translationSource':
-                if (!reply.translation) reply.translation = { text: '', source: '中文', visible: true };
-                reply.translation.source = value || '中文';
+                if (!reply.translation) reply.translation = { text: '', source: getDefaultTranslationSource(), visible: true };
+                reply.translation.source = value || getDefaultTranslationSource();
                 break;
             case 'translationVisible':
-                if (!reply.translation) reply.translation = { text: '', source: '中文', visible: true };
+                if (!reply.translation) reply.translation = { text: '', source: getDefaultTranslationSource(), visible: true };
                 reply.translation.visible = value === true || value === 'true';
                 break;
         }
@@ -1773,21 +1850,21 @@ function updateData(tweetId, replyId, field, value) {
                 setTweetMediaImages(tweet, [value]);
                 break;
             case 'translationText':
-                if (!tweet.translation) tweet.translation = { text: '', source: '中文', visible: true };
+                if (!tweet.translation) tweet.translation = { text: '', source: getDefaultTranslationSource(), visible: true };
                 tweet.translation.text = value;
                 break;
             case 'translationSource':
-                if (!tweet.translation) tweet.translation = { text: '', source: '中文', visible: true };
-                tweet.translation.source = value || '中文';
+                if (!tweet.translation) tweet.translation = { text: '', source: getDefaultTranslationSource(), visible: true };
+                tweet.translation.source = value || getDefaultTranslationSource();
                 break;
             case 'translationVisible':
-                if (!tweet.translation) tweet.translation = { text: '', source: '中文', visible: true };
+                if (!tweet.translation) tweet.translation = { text: '', source: getDefaultTranslationSource(), visible: true };
                 tweet.translation.visible = value === true || value === 'true';
                 break;
         }
     }
 
-    // 保存到 localStorage
+    // 保存到统一状态（IndexedDB）
     saveData(currentData);
 }
 
@@ -1796,7 +1873,7 @@ function updateData(tweetId, replyId, field, value) {
 // ========================================
 
 function deleteTweet(tweetId) {
-    if (confirm('确定要删除这条推文吗？')) {
+    if (confirm(t('deleteTweetConfirm'))) {
         currentData = currentData.filter(t => t.id !== tweetId);
         saveData(currentData);
         renderTimeline();
@@ -1804,7 +1881,7 @@ function deleteTweet(tweetId) {
 }
 
 function deleteReply(tweetId, replyId) {
-    if (confirm('确定要删除这条回复吗？')) {
+    if (confirm(t('deleteReplyConfirm'))) {
         const tweet = currentData.find(t => t.id === tweetId);
         if (tweet && tweet.replies) {
             removeReplyById(tweet, replyId);
@@ -1847,11 +1924,11 @@ function parseNumber(str) {
 
 function getFieldLabel(field) {
     const labels = {
-        comments: '评论数',
-        retweets: '转发数',
-        likes: '点赞数',
-        bookmarks: '书签数',
-        views: '查看数'
+        comments: t('fieldComments'),
+        retweets: t('fieldRetweets'),
+        likes: t('fieldLikes'),
+        bookmarks: t('fieldBookmarks'),
+        views: t('fieldViews')
     };
     return labels[field] || field;
 }
@@ -1904,7 +1981,29 @@ const I18N = {
         related: '相关',
         viewQuotes: '查看引用',
         followAction: '关注',
-        followingAction: '已关注'
+        followingAction: '已关注',
+        noAccount: '无账户',
+        close: '关闭',
+        edit: '编辑',
+        avatar: '头像',
+        delete: '删除',
+        accountEmpty: '还没有账户',
+        deleteTweetConfirm: '确定要删除这条推文吗？',
+        deleteReplyConfirm: '确定要删除这条回复吗？',
+        confirmDeleteAccount: '确定删除账户 {name} ({handle})？',
+        promptAccountName: '昵称',
+        promptAccountHandle: 'ID(@handle)',
+        newRoleName: '新角色',
+        newRoleHandle: '@new_role',
+        editFieldPrompt: '编辑 {field}:',
+        fieldComments: '评论数',
+        fieldRetweets: '转发数',
+        fieldLikes: '点赞数',
+        fieldBookmarks: '书签数',
+        fieldViews: '查看数',
+        translationPlaceholder: '翻译文本',
+        syncAccountAvatar: '同时同步为该账号头像',
+        cropHelp: '拖动边中点可改长宽比，右下角可自由缩放'
     },
     'ja-JP': {
         nav: ['ホーム', '話題を検索', '通知', 'メッセージ', 'ヤチヨ', 'ブックマーク', 'クリエイタースタジオ', 'Premium', 'プロフィール', 'もっと見る'],
@@ -1944,7 +2043,29 @@ const I18N = {
         related: '関連',
         viewQuotes: '引用を表示',
         followAction: 'フォロー',
-        followingAction: 'フォロー中'
+        followingAction: 'フォロー中',
+        noAccount: 'アカウントなし',
+        close: '閉じる',
+        edit: '編集',
+        avatar: 'アイコン',
+        delete: '削除',
+        accountEmpty: 'まだアカウントがありません',
+        deleteTweetConfirm: 'このポストを削除しますか？',
+        deleteReplyConfirm: 'この返信を削除しますか？',
+        confirmDeleteAccount: 'アカウント {name} ({handle}) を削除しますか？',
+        promptAccountName: '表示名',
+        promptAccountHandle: 'ID(@handle)',
+        newRoleName: '新しいキャラ',
+        newRoleHandle: '@new_role',
+        editFieldPrompt: '{field}を編集:',
+        fieldComments: '返信数',
+        fieldRetweets: 'リポスト数',
+        fieldLikes: 'いいね数',
+        fieldBookmarks: 'ブックマーク数',
+        fieldViews: '表示数',
+        translationPlaceholder: '翻訳テキスト',
+        syncAccountAvatar: 'このポストのアイコンをアカウントにも同期',
+        cropHelp: '辺の中央で比率調整、右下で自由リサイズ'
     }
 };
 
@@ -2113,6 +2234,14 @@ function applyLocale() {
     setText('#sidebar-locale-label', t('language'));
     setText('#sidebar-sort-label', getTimelineSortMode() === 'date' ? t('sortByDate') : t('sortByPost'));
     setText('#compose-translation-toggle-btn', t('withTranslation'));
+    setText('#account-manager-close', t('close'));
+    setText('#sync-account-avatar-option-wrap span', t('syncAccountAvatar'));
+    setText('#image-modal .crop-help', t('cropHelp'));
+
+    const transInput = document.getElementById('compose-translation-text');
+    if (transInput) {
+        transInput.setAttribute('placeholder', t('translationPlaceholder'));
+    }
 
     // Tweet detail "相关 / 查看引用" row
     document.querySelectorAll('.tweet-related-row .related-label').forEach(el => {
@@ -2150,6 +2279,9 @@ function applyLocale() {
         btn.textContent = btn.classList.contains('following') ? t('followingAction') : t('followAction');
     });
 
+    if (document.getElementById('account-manager-list')) {
+        renderAccountManager();
+    }
 }
 
 function ensureTopTools() {
@@ -2354,7 +2486,7 @@ function ensureComposeControls() {
             </div>
             <button id="compose-translation-toggle-btn" class="inline-mini-btn subtle-btn compose-translation-btn" type="button">${t('withTranslation')}</button>
         </div>
-        <textarea id="compose-translation-text" class="compose-translation-input" placeholder="翻译文本" style="display:none"></textarea>
+        <textarea id="compose-translation-text" class="compose-translation-input" placeholder="${t('translationPlaceholder')}" style="display:none"></textarea>
         <div id="compose-media-preview" class="composer-media-preview" style="display:none"></div>
     `;
 
@@ -2407,7 +2539,7 @@ function fillAccountSelectors() {
     if (select) {
         select.innerHTML = '';
         if (!accounts.length) {
-            select.innerHTML = `<option value="">${t('sendAs')}: 无账户</option>`;
+            select.innerHTML = `<option value="">${t('sendAs')}: ${t('noAccount')}</option>`;
             return;
         }
         accounts.forEach(acc => {
@@ -2430,7 +2562,7 @@ function fillAccountSelectors() {
 
 function buildInlineAccountOptions(selectedId) {
     const accounts = getAccounts();
-    if (!accounts.length) return `<option value="">${t('sendAs')}: 无账户</option>`;
+    if (!accounts.length) return `<option value="">${t('sendAs')}: ${t('noAccount')}</option>`;
     let html = '';
     accounts.forEach(acc => {
         html += `<option value="${acc.id}" ${acc.id === selectedId ? 'selected' : ''}>${acc.name} (${acc.handle})</option>`;
@@ -2473,7 +2605,7 @@ function submitComposeTweet() {
         time: manualTimeText || formatDateYMD(new Date()),
         views: '0',
         stats: { comments: 0, retweets: 0, likes: 0, bookmarks: 0 },
-        translation: transToggleBtn?.classList.contains('active') ? { text: transText?.value || '', source: '中文', visible: true } : null,
+        translation: transToggleBtn?.classList.contains('active') ? { text: transText?.value || '', source: getDefaultTranslationSource(), visible: true } : null,
         replies: []
     };
     if (composeDraftMediaIds.length) {
@@ -2629,7 +2761,7 @@ function ensureAccountManager() {
             </div>
             <div id="account-manager-list"></div>
             <div class="modal-actions">
-                <button type="button" id="account-manager-close">关闭</button>
+                <button type="button" id="account-manager-close">${t('close')}</button>
             </div>
         </div>
     `;
@@ -2642,7 +2774,7 @@ function ensureAccountManager() {
     document.getElementById('account-manager-close').onclick = () => modal.classList.remove('active');
     document.getElementById('account-add-btn').onclick = () => {
         const id = `acc_${Date.now()}`;
-        upsertAccount({ id, name: '新角色', handle: '@new_role', avatar: '', verified: false });
+        upsertAccount({ id, name: t('newRoleName'), handle: t('newRoleHandle'), avatar: '', verified: false });
         renderAccountManager();
         fillAccountSelectors();
     };
@@ -2739,7 +2871,7 @@ function renderAccountManager() {
     const accounts = getAccounts();
 
     if (!accounts.length) {
-        list.innerHTML = '<div class="account-manager-empty">还没有账户</div>';
+        list.innerHTML = `<div class="account-manager-empty">${t('accountEmpty')}</div>`;
         return;
     }
 
@@ -2753,9 +2885,9 @@ function renderAccountManager() {
                 </div>
             </div>
             <div class="account-manager-actions">
-                <button class="account-action-btn" data-action="edit">编辑</button>
-                <button class="account-action-btn" data-action="avatar">头像</button>
-                <button class="account-action-btn danger" data-action="delete">删除</button>
+                <button class="account-action-btn" data-action="edit">${t('edit')}</button>
+                <button class="account-action-btn" data-action="avatar">${t('avatar')}</button>
+                <button class="account-action-btn danger" data-action="delete">${t('delete')}</button>
             </div>
         </div>
     `).join('');
@@ -3184,7 +3316,7 @@ if (!window.__v3EventsBound) {
             const tweetId = parseInt(translationToggleBtn.dataset.tweetId, 10);
             const tweet = currentData.find(tw => tw.id === tweetId);
             if (!tweet) return;
-            if (!tweet.translation) tweet.translation = { text: '', source: '中文', visible: true };
+            if (!tweet.translation) tweet.translation = { text: '', source: getDefaultTranslationSource(), visible: true };
             tweet.translation.visible = !(tweet.translation.visible !== false);
             saveData(currentData);
             currentView === 'timeline' ? renderTimeline() : renderTweetDetail(currentTweetId);
@@ -3200,7 +3332,7 @@ if (!window.__v3EventsBound) {
             const tweet = currentData.find(tw => tw.id === tweetId);
             const reply = tweet ? findReplyById(tweet, replyId) : null;
             if (!reply) return;
-            if (!reply.translation) reply.translation = { text: '', source: '中文', visible: true };
+            if (!reply.translation) reply.translation = { text: '', source: getDefaultTranslationSource(), visible: true };
             reply.translation.visible = !(reply.translation.visible !== false);
             saveData(currentData);
             renderTweetDetail(tweetId);
@@ -3261,9 +3393,9 @@ if (!window.__v3EventsBound) {
 
             const action = accountActionBtn.dataset.action;
             if (action === 'edit') {
-                const name = prompt('昵称', account.name || '');
+                const name = prompt(t('promptAccountName'), account.name || '');
                 if (name === null) return;
-                const handle = prompt('ID(@handle)', account.handle || '');
+                const handle = prompt(t('promptAccountHandle'), account.handle || '');
                 if (handle === null) return;
                 const updated = upsertAccount({ ...account, name: name.trim() || account.name, handle: handle.trim() || account.handle });
                 applyAccountChangesToTweets(updated);
@@ -3275,7 +3407,7 @@ if (!window.__v3EventsBound) {
                 selectAndSaveAvatar(account);
             }
             if (action === 'delete') {
-                if (!confirm(`确定删除账户 ${account.name} (${account.handle})？`)) return;
+                if (!confirm(ti('confirmDeleteAccount', { name: account.name || '', handle: account.handle || '' }))) return;
                 removeAccount(account.id);
                 currentData.forEach(tw => {
                     if (tw.user?.accountId === account.id) tw.user.accountId = null;
@@ -3307,29 +3439,3 @@ if (!window.__v3EventsBound) {
 
 window.toggleAppMode = toggleAppMode;
 window.exportHtmlSnapshot = exportHtmlSnapshot;
-
-document.addEventListener('DOMContentLoaded', async () => {
-    if (window.ensureAppStateReady) {
-        await window.ensureAppStateReady();
-    }
-
-    const searchInput = document.querySelector('.search-box input');
-    if (searchInput) searchInput.value = '';
-    timelineSearchQuery = '';
-
-    const ui = getUIState();
-    const viewerId = ui.defaultAuthorId || getAccounts()[0]?.id || null;
-    if (viewerId) {
-        setDefaultAuthorId(viewerId);
-        setComposeAuthorId(viewerId);
-    }
-
-    ensureTopTools();
-    ensureComposeControls();
-    ensureAccountManager();
-    ensureViewerSwitcher();
-    fillAccountSelectors();
-    applyMode(getUIState().mode || 'edit');
-    applyLocale();
-    renderViewerProfile();
-});

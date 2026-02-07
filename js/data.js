@@ -310,13 +310,17 @@ function inferAccountsFromTweets(tweets) {
         user.accountId = id;
     };
 
+    const walkReplies = (replies) => {
+        if (!Array.isArray(replies)) return;
+        for (const reply of replies) {
+            upsertFromUser(reply.user);
+            walkReplies(reply.replies);
+        }
+    };
+
     for (const tweet of tweets) {
         upsertFromUser(tweet.user);
-        if (Array.isArray(tweet.replies)) {
-            for (const reply of tweet.replies) {
-                upsertFromUser(reply.user);
-            }
-        }
+        walkReplies(tweet.replies);
     }
 
     return Array.from(accountsMap.values());
