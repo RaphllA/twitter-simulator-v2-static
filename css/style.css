@@ -2089,7 +2089,7 @@ button {
         border-radius: 16px;
         padding: 10px 10px 12px;
         box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
-        z-index: 60;
+        z-index: 119;
     }
 
     .sidebar-tools {
@@ -2589,7 +2589,7 @@ button {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.45);
-    z-index: 59;
+    z-index: 118;
 }
 
 @media (max-width: 1024px) {
@@ -2626,6 +2626,10 @@ button {
 @media (max-width: 768px) {
     body.sidebar-tools-open {
         overflow: hidden;
+    }
+
+    body.sidebar-tools-open .left-sidebar {
+        z-index: 121;
     }
 
     body.sidebar-tools-open .sidebar-tools-backdrop {
@@ -2746,6 +2750,32 @@ button {
 
 #tweet-detail-view .nested-replies:empty {
     display: none;
+}
+
+/* Keep mobile top nav full-width (override later desktop refinements). */
+@media (max-width: 768px) {
+    .app-container {
+        display: block;
+    }
+
+    .left-sidebar {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .left-sidebar .nav-content {
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
+    .left-sidebar .nav-content > .nav-item {
+        display: none;
+    }
+
+    .left-sidebar .nav-content > .nav-item:nth-of-type(-n+4),
+    .left-sidebar .nav-content > #nav-more {
+        display: flex;
+    }
 }
 
 #tweet-detail-view .nested-reply-card {
