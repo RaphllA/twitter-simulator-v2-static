@@ -1829,8 +1829,8 @@ function applyLocale() {
     setText('.timeline-tabs .tab:last-child', t('following'));
     setText('.left-sidebar .post-btn', t('post'));
     setText('.compose-submit-btn', t('post'));
-    setText('#sidebar-viewer-label', t('viewer'));
     setText('#account-add-btn', t('addAccount'));
+    setText('#sidebar-account-manager-label', t('accountManager'));
     setText('#sidebar-import-label', t('importData'));
     setText('#sidebar-export-label', t('exportData'));
     setText('#sidebar-export-html-label', t('exportHtml'));
@@ -1898,13 +1898,13 @@ function ensureTopTools() {
         tools.id = 'sidebar-tools';
         tools.className = 'sidebar-tools';
         tools.innerHTML = `
-            <button id="sidebar-viewer-btn" class="sidebar-tool-btn" type="button">
-                <svg viewBox="0 0 24 24"><path d="M5.651 19h12.698c-.337-1.8-1.023-3.21-1.945-4.19C15.318 13.65 13.838 13 12 13s-3.317.65-4.404 1.81c-.922.98-1.608 2.39-1.945 4.19zm.486-5.56C7.627 11.85 9.648 11 12 11s4.373.85 5.863 2.44c1.477 1.58 2.366 3.8 2.632 6.46l.11 1.1H3.395l.11-1.1c.266-2.66 1.155-4.88 2.632-6.46zM12 4c-1.105 0-2 .9-2 2s.895 2 2 2 2-.9 2-2-.895-2-2-2zM8 6c0-2.21 1.791-4 4-4s4 1.79 4 4-1.791 4-4 4-4-1.79-4-4z"/></svg>
-                <span id="sidebar-viewer-label"></span>
-            </button>
             <button id="sidebar-sort-btn" class="sidebar-tool-btn" type="button">
                 <svg viewBox="0 0 24 24"><path d="M3.75 6.5h10.5v2H3.75v-2zm0 4.5h16.5v2H3.75v-2zm0 4.5h7.5v2h-7.5v-2z"/></svg>
                 <span id="sidebar-sort-label"></span>
+            </button>
+            <button id="sidebar-account-manager-btn" class="sidebar-tool-btn" type="button">
+                <svg viewBox="0 0 24 24"><path d="M7.501 19.917L7.471 21H.472l.029-1.027c.184-6.618 3.736-8.977 7-8.977.963 0 1.95.212 2.87.672-.761.557-1.408 1.267-1.862 2.085-.567-.157-1.224-.257-1.908-.257-1.957 0-4.152.924-4.6 5.421h4.606l-.106.004zM10.996 15c-1.52 0-2.762-1.243-2.762-2.762 0-1.52 1.243-2.762 2.762-2.762s2.762 1.243 2.762 2.762c0 1.52-1.243 2.762-2.762 2.762zm0-2c.421 0 .762-.341.762-.762 0-.421-.341-.762-.762-.762s-.762.341-.762.762c0 .421.341.762.762.762zm-6.49-4.486c-1.794 0-3.252-1.458-3.252-3.252S2.712 2.01 4.506 2.01s3.252 1.458 3.252 3.252-1.458 3.252-3.252 3.252zm0-2c.691 0 1.252-.56 1.252-1.252s-.56-1.252-1.252-1.252-1.252.56-1.252 1.252.56 1.252 1.252 1.252zM19.498 21h-7.995c-.274 0-.497-.224-.497-.5 0-2.761 2.238-5 5-5s5 2.239 5 5c0 .276-.223.5-.497.5h-.011zm-7.428-1h6.891c-.24-1.722-1.707-3.053-3.461-3.053s-3.221 1.331-3.43 3.053zM16.01 14.005c-1.795 0-3.252-1.458-3.252-3.253S14.214 7.5 16.01 7.5s3.252 1.458 3.252 3.252-1.458 3.253-3.252 3.253zm0-2c.691 0 1.252-.561 1.252-1.253S16.7 9.5 16.009 9.5s-1.252.56-1.252 1.252.56 1.253 1.252 1.253z"/></svg>
+                <span id="sidebar-account-manager-label"></span>
             </button>
             <button id="mode-toggle-btn" class="sidebar-tool-btn mode-toggle-btn" type="button">
                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm18.71-11.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 2-1.66z"/></svg>
@@ -1952,16 +1952,14 @@ function ensureTopTools() {
         });
     }
 
-    const viewerBtn = document.getElementById('sidebar-viewer-btn');
-    if (viewerBtn && !viewerBtn.dataset.bound) {
-        viewerBtn.dataset.bound = '1';
-        viewerBtn.addEventListener('click', (e) => {
+    const accountManagerBtn = document.getElementById('sidebar-account-manager-btn');
+    if (accountManagerBtn && !accountManagerBtn.dataset.bound) {
+        accountManagerBtn.dataset.bound = '1';
+        accountManagerBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
-                closeSidebarTools();
-            }
-            openViewerSwitcher(viewerBtn);
+            renderAccountManager();
+            document.getElementById('account-manager-modal')?.classList.add('active');
         });
     }
 
