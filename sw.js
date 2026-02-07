@@ -1,25 +1,66 @@
-// Service Worker cache is independent from IndexedDB/localStorage app data.
-// Bump CACHE_VERSION on every release to ensure users receive fresh assets.
+// Service Worker cache strategy:
+// - Core app files (HTML/CSS/JS/manifest/markdown): network-first + cache:no-store
+//   to minimize stale deploys.
+// - Other same-origin assets: stale-while-revalidate for speed/offline fallback.
+// App data (IndexedDB/localStorage) is not affected by this file cache.
 const CACHE_PREFIX = 'twitter-simulator-static';
-const CACHE_VERSION = 'v5'; // Bump per release, e.g. v6 / 2026-02-07
-const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
+const CACHE_NAME = `${CACHE_PREFIX}-runtime-v2`;
+const INDEX_FALLBACK_URL = './index.html';
 
-const PRECACHE_URLS = [
+const OFFLINE_FALLBACKS = [
   './',
   './index.html',
   './css/style.css',
   './js/data.js',
   './js/image-store.js',
   './js/app.js',
-  './STORY_FOR_CREATORS.md',
   './manifest.webmanifest',
   './assets/icon.svg'
 ];
 
-async function precache() {
+function isNavigationRequest(request) {
+  return request.mode === 'navigate' || (request.headers.get('accept') || '').includes('text/html');
+}
+
+function shouldUseNetworkFirst(request, url) {
+  if (isNavigationRequest(request)) return true;
+  if (request.destination === 'script' || request.destination === 'style' || request.destination === 'document') {
+    return true;
+  }
+  return (
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('.webmanifest') ||
+    url.pathname.endsWith('.md')
+  );
+}
+
+function withNoStore(request) {
+  return new Request(request, { cache: 'no-store' });
+}
+
+async function putInCache(cache, request, response) {
+  if (!response || !response.ok) return;
+  try {
+    await cache.put(request, response.clone());
+  } catch {
+    // Ignore opaque/invalid cache puts.
+  }
+}
+
+async function precacheFallbacks() {
   const cache = await caches.open(CACHE_NAME);
-  // Use cache:reload to bypass HTTP cache when refreshing on a new SW install.
-  await cache.addAll(PRECACHE_URLS.map((url) => new Request(url, { cache: 'reload' })));
+  for (const url of OFFLINE_FALLBACKS) {
+    try {
+      const response = await fetch(new Request(url, { cache: 'no-store' }));
+      if (response && response.ok) {
+        await cache.put(url, response.clone());
+      }
+    } catch {
+      // Ignore network failures during install; runtime handlers still work.
+    }
+  }
 }
 
 async function cleanupOldCaches() {
@@ -28,39 +69,37 @@ async function cleanupOldCaches() {
   await Promise.all(ours.map((key) => caches.delete(key)));
 }
 
-async function networkFirst(request, fallbackUrl = './index.html') {
+async function networkFirstNoStore(request) {
   const cache = await caches.open(CACHE_NAME);
   try {
-    const response = await fetch(request);
-    if (response && response.ok) {
-      cache.put(request, response.clone());
-    }
+    const response = await fetch(withNoStore(request));
+    await putInCache(cache, request, response);
     return response;
-  } catch (err) {
-    const cached = await cache.match(request);
+  } catch (error) {
+    const cached = await cache.match(request, { ignoreSearch: true });
     if (cached) return cached;
-    return cache.match(fallbackUrl);
+    if (isNavigationRequest(request)) {
+      const fallback = await cache.match(INDEX_FALLBACK_URL);
+      if (fallback) return fallback;
+    }
+    throw error;
   }
 }
 
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(request);
-
   const fetchPromise = fetch(request)
-    .then((response) => {
-      if (response && response.ok) {
-        cache.put(request, response.clone());
-      }
+    .then(async (response) => {
+      await putInCache(cache, request, response);
       return response;
     })
     .catch(() => null);
-
-  return cached || (await fetchPromise);
+  return cached || (await fetchPromise) || Response.error();
 }
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(precache());
+  event.waitUntil(precacheFallbacks());
   self.skipWaiting();
 });
 
@@ -77,17 +116,16 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-
   const url = new URL(event.request.url);
-  // Don't try to cache cross-origin.
   if (url.origin !== self.location.origin) return;
 
-  // Always try to refresh navigations/HTML first so users see new UI quickly.
-  if (event.request.mode === 'navigate' || (event.request.headers.get('accept') || '').includes('text/html')) {
-    event.respondWith(networkFirst(event.request, './index.html'));
+  // Let browser handle SW script requests directly to avoid update edge-cases.
+  if (url.pathname.endsWith('/sw.js') || url.pathname.endsWith('/sw.js.map')) return;
+
+  if (shouldUseNetworkFirst(event.request, url)) {
+    event.respondWith(networkFirstNoStore(event.request));
     return;
   }
 
-  // Assets: serve cached fast, refresh in background.
   event.respondWith(staleWhileRevalidate(event.request));
 });

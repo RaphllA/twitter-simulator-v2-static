@@ -403,6 +403,71 @@
         </div>
     </div>
 
+    <script>
+        (() => {
+            if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
+
+            const SW_URL = './sw.js';
+            const CACHE_PREFIX = 'twitter-simulator-static';
+            const CACHE_MIGRATION_KEY = 'tukuyomi-sw-cache-migrated-v2';
+            const RELOAD_GUARD_KEY = 'tukuyomi-sw-controller-reloaded';
+            let hasReloaded = false;
+
+            const reloadOnce = () => {
+                if (hasReloaded) return;
+                hasReloaded = true;
+                try {
+                    if (sessionStorage.getItem(RELOAD_GUARD_KEY) === '1') return;
+                    sessionStorage.setItem(RELOAD_GUARD_KEY, '1');
+                } catch (_) { }
+                window.location.reload();
+            };
+
+            navigator.serviceWorker.addEventListener('controllerchange', reloadOnce);
+
+            window.addEventListener('load', async () => {
+                try {
+                    const registration = await navigator.serviceWorker.register(SW_URL, { updateViaCache: 'none' });
+
+                    const activateWaitingWorker = () => {
+                        if (registration.waiting) {
+                            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                    };
+
+                    registration.addEventListener('updatefound', () => {
+                        const installing = registration.installing;
+                        if (!installing) return;
+                        installing.addEventListener('statechange', () => {
+                            if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                                activateWaitingWorker();
+                            }
+                        });
+                    });
+
+                    activateWaitingWorker();
+                    await registration.update();
+
+                    try {
+                        if ('caches' in window && !localStorage.getItem(CACHE_MIGRATION_KEY)) {
+                            const keys = await caches.keys();
+                            await Promise.all(
+                                keys
+                                    .filter((key) => key.startsWith(`${CACHE_PREFIX}-`))
+                                    .map((key) => caches.delete(key))
+                            );
+                            localStorage.setItem(CACHE_MIGRATION_KEY, '1');
+                            await registration.update();
+                        }
+                    } catch (cacheError) {
+                        console.warn('SW cache cleanup skipped:', cacheError);
+                    }
+                } catch (swError) {
+                    console.warn('SW registration failed:', swError);
+                }
+            });
+        })();
+    </script>
     <script src="js/data.js"></script>
     <script src="js/image-store.js"></script>
     <script src="js/app.js"></script>
