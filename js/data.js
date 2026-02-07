@@ -6,7 +6,7 @@
  */
 
 // 数据版本号 - 每次更新默认数据时递增
-const DATA_VERSION = 8;
+const DATA_VERSION = 9;
 
 // 示例推文数据
 const tweetsData = [
@@ -15,11 +15,17 @@ const tweetsData = [
         user: {
             name: "ヤチヨ",
             handle: "@yachi8000",
-            avatar: "",
+            avatar: "assets/default/avatars/avatar-yachiyo.jpg",
             verified: true
         },
         content: "【お知らせ】\n皆さん！！ 大ニュースです！\n\nなんと私、かぐやちゃん、いろぷちゃんの三人で\n合同ライブを開催することになりました！！ 🎉🎉\n\n久しぶりにかぐちゃんとステージに立てるのが\n本当に楽しみにしています...！\n\n詳細は後日発表します！\nぜひ見に来てくださいね！ ✨\n\n#三人ライブ #ヤチヨ復帰 #かぐや #合同ライブ",
-        media: null,
+        media: {
+            type: "image",
+            url: "assets/default/tweets/tweet-1-main.jpg",
+            images: [
+                "assets/default/tweets/tweet-1-main.jpg"
+            ]
+        },
         time: "下午 2:30 · 2040年9月10日",
         views: "642.5万",
         stats: {
@@ -36,11 +42,17 @@ const tweetsData = [
         user: {
             name: "月読ニュース",
             handle: "@tsukuyomi_news",
-            avatar: "",
+            avatar: "assets/default/avatars/avatar-tsukuyomi-news.jpg",
             verified: true
         },
         content: "【独占取材】東大具身知能研究所、世界初の画期的成果を達成\n\n酒寄いろぷ所長への独占インタビューによると、同研究所は人型ロボットの\n自律判断において驚異的なブレークスルーを実現したとのこと。\n\n「私たちの研究は、ロボットが人間のように自然に動き、考えることを可能に\nします」と酒寄所長は語った。\n\n#東大 #具身知能 #ロボット #AI研究 #酒寄いろぷ",
-        media: null,
+        media: {
+            type: "image",
+            url: "assets/default/tweets/tweet-2-main.jpg",
+            images: [
+                "assets/default/tweets/tweet-2-main.jpg"
+            ]
+        },
         time: "上午 8:45 · 2040年9月9日",
         views: "178.5万",
         stats: {
@@ -57,7 +69,7 @@ const tweetsData = [
         user: {
             name: "彩輝激推し",
             handle: "@irokaguforever",
-            avatar: "",
+            avatar: "assets/default/avatars/avatar-irokaguforever.jpg",
             verified: false
         },
         content: "やっぱり私はいろかぐなんだよな\n\nいろヤチヨも尊いんだけど、やっぱりいろかぐには敵わない\nヤチヨごめん。\n\nだってさ、いろぷちゃん総受けじゃん？？\nかぐやは完全に\nこの組み合わせ性癖すぎて毎日死んでる\n推しカプが尊すぎて生きるのが辛い\n\n#いろかぐ #彩葉 #いろぷ受け #かぐや攻め #尊い",
@@ -77,7 +89,7 @@ const tweetsData = [
                 user: {
                     name: "かぐや",
                     handle: "@kaguya",
-                    avatar: "",
+                    avatar: "assets/default/avatars/avatar-kaguya.jpg",
                     verified: false
                 },
                 content: "わかるかわち！！ いままでずっとずっと、私も他のヤツよりいろかぐだと思いますっ！！！\n！！！！（ていうかこれ誰でも尊いでしょ）？？？",
@@ -96,7 +108,7 @@ const tweetsData = [
                 user: {
                     name: "彩輝激推し",
                     handle: "@irokaguforever",
-                    avatar: "",
+                    avatar: "assets/default/avatars/avatar-irokaguforever.jpg",
                     verified: false
                 },
                 content: "え？？？ ご本人？？？？？",
@@ -115,7 +127,7 @@ const tweetsData = [
                 user: {
                     name: "かぐや",
                     handle: "@kaguya",
-                    avatar: "",
+                    avatar: "assets/default/avatars/avatar-kaguya.jpg",
                     verified: false
                 },
                 content: "本人じゃないです！！ うるさくてすみません！！",
@@ -134,7 +146,7 @@ const tweetsData = [
                 user: {
                     name: "彩輝激推し",
                     handle: "@irokaguforever",
-                    avatar: "",
+                    avatar: "assets/default/avatars/avatar-irokaguforever.jpg",
                     verified: false
                 },
                 content: "じゃあ、かぐやちゃんやっぱり攻めだな！！",
@@ -250,7 +262,11 @@ function getDefaultState() {
         ui: {
             mode: 'edit',
             textFields: {},
-            avatarFields: {},
+            avatarFields: {
+                'follow-avatar-1': 'assets/default/ui/follow-1.jpg',
+                'follow-avatar-2': 'assets/default/ui/follow-2.jpg',
+                'follow-avatar-3': 'assets/default/ui/follow-3.jpg'
+            },
             defaultAuthorId: initialViewerId,
             composeAuthorId: initialViewerId
         }
