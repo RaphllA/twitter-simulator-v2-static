@@ -29,6 +29,8 @@ let cropPointerState = null;
 const TIMELINE_SORT_KEY = 'tukuyomi-timeline-sort';
 let composeDraftMediaIds = [];
 const replyDraftMap = new Map();
+let storyModalTextCache = null;
+let storyModalLoadPromise = null;
 
 // ========================================
 // Mobile overlays (right drawer + tools)
@@ -948,6 +950,7 @@ function setupEventListeners() {
         if (e.key === 'Escape') {
             closeTextModal();
             closeImageModal();
+            closeStoryModal();
             closeSidebarTools();
             closeRightSidebarDrawer();
         }
@@ -966,6 +969,12 @@ function setupEventListeners() {
         }
     });
 
+    document.getElementById('story-modal')?.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'story-modal') {
+            closeStoryModal();
+        }
+    });
+
     const imageInput = document.getElementById('image-input');
     if (imageInput) {
         imageInput.addEventListener('change', handleImageInputChange);
@@ -978,13 +987,26 @@ function setupEventListeners() {
         exploreNav.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            toggleRightSidebarDrawer();
+        });
+    }
+
+    const notificationsNav = document.getElementById('nav-notifications');
+    if (notificationsNav && !notificationsNav.dataset.boundGuideRestore) {
+        notificationsNav.dataset.boundGuideRestore = '1';
+        notificationsNav.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             if (typeof window.setGuideTweetHidden === 'function') {
                 window.setGuideTweetHidden(false);
             }
+            closeRightSidebarDrawer();
+            closeSidebarTools();
             if (currentView === 'timeline') {
                 renderTimeline();
+            } else {
+                showTimeline();
             }
-            toggleRightSidebarDrawer();
         });
     }
 
@@ -1226,6 +1248,42 @@ function closeTextModal() {
     editingField = null;
     editingTweetId = null;
     editingReplyId = null;
+}
+
+function closeStoryModal() {
+    document.getElementById('story-modal')?.classList.remove('active');
+}
+
+async function openStoryModal() {
+    const modal = document.getElementById('story-modal');
+    const body = document.getElementById('story-modal-body');
+    if (!modal || !body) return;
+
+    modal.classList.add('active');
+    if (storyModalTextCache) {
+        body.textContent = storyModalTextCache;
+        return;
+    }
+
+    body.textContent = '加载中...';
+    if (!storyModalLoadPromise) {
+        storyModalLoadPromise = (async () => {
+            const res = await fetch('STORY_FOR_CREATORS.md');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const text = await res.text();
+            storyModalTextCache = text;
+            return text;
+        })().catch((err) => {
+            storyModalLoadPromise = null;
+            throw err;
+        });
+    }
+
+    try {
+        body.textContent = await storyModalLoadPromise;
+    } catch (err) {
+        body.textContent = '加载失败，请稍后重试。\\n\\n' + String(err?.message || err);
+    }
 }
 
 function confirmText() {
@@ -3105,6 +3163,22 @@ if (!window.__v3EventsBound) {
     window.__v3EventsBound = true;
 
     document.addEventListener('click', async (e) => {
+        const tweetLink = e.target.closest('a.tweet-link');
+        if (tweetLink) {
+            try {
+                const href = tweetLink.getAttribute('href') || '';
+                const url = new URL(href, window.location.href);
+                if (url.pathname.endsWith('/STORY_FOR_CREATORS.md')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openStoryModal();
+                    return;
+                }
+            } catch {
+                // ignore
+            }
+        }
+
         const viewerSwitcherBtn = e.target.closest('.user-profile .more-icon');
         if (viewerSwitcherBtn) {
             e.preventDefault();

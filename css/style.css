@@ -1505,6 +1505,10 @@ button {
     z-index: 1300;
 }
 
+#story-modal {
+    z-index: 1200;
+}
+
 .modal-content {
     background-color: var(--bg-primary);
     border-radius: var(--border-radius);
@@ -1512,6 +1516,26 @@ button {
     min-width: 320px;
     max-width: 500px;
     width: 90%;
+}
+
+.story-modal-content {
+    max-width: 720px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.story-modal-body {
+    flex: 1;
+    overflow: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    white-space: pre-wrap;
+    line-height: 1.6;
+    margin-bottom: 16px;
 }
 
 .modal-content h3 {
