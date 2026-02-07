@@ -55,7 +55,7 @@
 可选（更推荐，用于 PWA/Service Worker 正常工作）：用任意静态服务器打开目录。
 
 ```powershell
-cd f:\所长的谣言\twitter-simulator-v2-static
+cd /path/to/twitter-simulator-v2-static
 python -m http.server 8000
 ```
 
