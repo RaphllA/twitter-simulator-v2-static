@@ -542,10 +542,12 @@ function createTweetCard(tweet, isDetail = false) {
         const guideHideBtnHtml = tweet.isGuide
             ? `<button class="guide-hide-btn" type="button" data-tweet-id="${tweet.id}">${getLocale() === 'ja-JP' ? 'この案内を隠す' : '隐藏本教程'}</button>`
             : '';
+        const tweetMetaRowHtml = (pinLabelHtml || guideHideBtnHtml)
+            ? `<div class="tweet-meta-row">${pinLabelHtml}${guideHideBtnHtml}</div>`
+            : '';
         card.innerHTML = `
             <button class="delete-btn" onclick="deleteTweet(${tweet.id}); event.stopPropagation();">×</button>
-            ${guideHideBtnHtml}
-            ${pinLabelHtml}
+            ${tweetMetaRowHtml}
             <div class="tweet-header">
                 <div class="tweet-avatar editable-avatar" data-tweet-id="${tweet.id}" data-field="avatar">
                     ${avatarHtml}
