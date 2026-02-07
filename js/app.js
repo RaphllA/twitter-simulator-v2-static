@@ -1958,6 +1958,9 @@ function ensureTopTools() {
         viewerBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+                closeSidebarTools();
+            }
             openViewerSwitcher(viewerBtn);
         });
     }
@@ -2373,6 +2376,21 @@ function closeViewerSwitcher() {
     menu.innerHTML = '';
 }
 
+function fillAccountAvatars(container, accounts) {
+    if (!container) return;
+    const accountMap = new Map((accounts || []).map(acc => [acc.id, acc]));
+    container.querySelectorAll('[data-account-id]').forEach(node => {
+        const accountId = node.dataset.accountId;
+        const account = accountMap.get(accountId);
+        const avatarHost = node.querySelector('.viewer-switcher-avatar, .account-manager-avatar');
+        if (!avatarHost) return;
+        const fallback = (account?.name || '?').trim().charAt(0) || '?';
+        avatarHost.textContent = fallback;
+        renderUIAvatar(avatarHost, account?.avatar || '');
+    });
+    loadAsyncImages(container);
+}
+
 function openViewerSwitcher(anchorEl) {
     ensureViewerSwitcher();
     const menu = document.getElementById('viewer-switcher-menu');
@@ -2384,6 +2402,7 @@ function openViewerSwitcher(anchorEl) {
     accounts.forEach(acc => {
         html += `
             <button class="viewer-switcher-item" data-account-id="${acc.id}">
+                <span class="viewer-switcher-avatar"></span>
                 <span class="viewer-switcher-name">${acc.name || ''}</span>
                 <span class="viewer-switcher-handle">${acc.handle || ''}</span>
                 <span class="viewer-switcher-check">${viewerId === acc.id ? '✓' : ''}</span>
@@ -2392,13 +2411,36 @@ function openViewerSwitcher(anchorEl) {
     });
     html += `<button class="viewer-switcher-manage">${t('accountManager')}</button>`;
     menu.innerHTML = html;
+    fillAccountAvatars(menu, accounts);
 
-    const rect = anchorEl.getBoundingClientRect();
-    const menuWidth = 260;
-    const left = Math.max(8, rect.right - menuWidth);
-    const top = rect.top - 8;
-    menu.style.left = `${left}px`;
-    menu.style.top = `${top}px`;
+    const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+    menu.classList.toggle('mobile', !!isMobile);
+
+    if (isMobile) {
+        const safeTop = 56;
+        menu.style.left = '12px';
+        menu.style.right = '12px';
+        menu.style.top = `${safeTop}px`;
+    } else {
+        menu.style.right = '';
+        const rect = anchorEl.getBoundingClientRect();
+        const menuWidth = 260;
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1280;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 800;
+        const estimatedHeight = Math.min(520, Math.max(220, 48 + (getAccounts().length * 68)));
+
+        const leftMin = 8;
+        const leftMax = Math.max(leftMin, viewportWidth - menuWidth - 8);
+        const left = Math.min(leftMax, Math.max(leftMin, rect.right - menuWidth));
+
+        const topMin = 8;
+        const topMax = Math.max(topMin, viewportHeight - estimatedHeight - 8);
+        const top = Math.min(topMax, Math.max(topMin, rect.top - 8));
+
+        menu.style.left = `${left}px`;
+        menu.style.top = `${top}px`;
+    }
+
     menu.style.display = 'block';
 }
 
@@ -2415,9 +2457,12 @@ function renderAccountManager() {
 
     list.innerHTML = accounts.map(acc => `
         <div class="account-manager-item" data-account-id="${acc.id}">
-            <div class="account-manager-meta">
-                <div class="account-manager-name">${acc.name || ''}</div>
-                <div class="account-manager-handle">${acc.handle || ''}</div>
+            <div class="account-manager-main">
+                <div class="account-manager-avatar"></div>
+                <div class="account-manager-meta">
+                    <div class="account-manager-name">${acc.name || ''}</div>
+                    <div class="account-manager-handle">${acc.handle || ''}</div>
+                </div>
             </div>
             <div class="account-manager-actions">
                 <button class="account-action-btn" data-action="edit">编辑</button>
@@ -2426,6 +2471,7 @@ function renderAccountManager() {
             </div>
         </div>
     `).join('');
+    fillAccountAvatars(list, accounts);
 }
 
 async function selectAndSaveAvatar(account) {

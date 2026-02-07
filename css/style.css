@@ -1497,6 +1497,14 @@ button {
     display: flex;
 }
 
+#account-manager-modal {
+    z-index: 1100;
+}
+
+#image-modal {
+    z-index: 1300;
+}
+
 .modal-content {
     background-color: var(--bg-primary);
     border-radius: var(--border-radius);
@@ -2455,14 +2463,45 @@ button {
     border-bottom: 1px solid var(--border-color);
 }
 
+.account-manager-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.account-manager-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.account-manager-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.account-manager-meta {
+    min-width: 0;
+}
+
 .account-manager-name {
     font-size: 14px;
     font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .account-manager-handle {
     font-size: 12px;
     color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .account-manager-actions {
@@ -2528,23 +2567,46 @@ button {
     padding: 8px;
 }
 
+.viewer-switcher-menu.mobile {
+    width: auto;
+    max-height: calc(100vh - 72px);
+    overflow-y: auto;
+}
+
 .viewer-switcher-title {
     font-size: 12px;
     color: var(--text-secondary);
     padding: 4px 8px 8px;
 }
 
-.viewer-switcher-item,
-.viewer-switcher-manage {
+.viewer-switcher-item {
     width: 100%;
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: auto 32px minmax(0, 1fr);
+    grid-template-areas:
+        "check avatar name"
+        "check avatar handle";
     gap: 4px 8px;
     text-align: left;
     border: 1px solid var(--border-color);
     border-radius: 10px;
     padding: 8px;
     color: var(--text-primary);
+}
+
+.viewer-switcher-avatar {
+    grid-area: avatar;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    align-self: center;
+}
+
+.viewer-switcher-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .viewer-switcher-item:hover,
@@ -2554,24 +2616,41 @@ button {
 }
 
 .viewer-switcher-name {
+    grid-area: name;
     font-size: 13px;
     font-weight: 600;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .viewer-switcher-handle {
+    grid-area: handle;
     font-size: 12px;
     color: var(--text-secondary);
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .viewer-switcher-check {
-    grid-row: 1 / span 2;
+    grid-area: check;
     align-self: center;
+    justify-self: center;
+    margin-right: 4px;
     color: var(--accent-blue);
 }
 
 .viewer-switcher-manage {
+    width: 100%;
+    text-align: left;
     margin-top: 6px;
     display: block;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 8px;
     border-color: var(--border-color);
     color: var(--accent-blue);
 }
