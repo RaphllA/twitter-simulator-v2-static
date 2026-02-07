@@ -6,10 +6,33 @@
  */
 
 // 数据版本号 - 每次更新默认数据时递增
-const DATA_VERSION = 11;
+const DATA_VERSION = 12;
 
 // 示例推文数据
 const tweetsData = [
+    {
+        id: 900001,
+        isGuide: true,
+        isPinned: true,
+        user: {
+            name: "色々",
+            handle: "@nihoheYCY",
+            avatar: "assets/default/avatars/avatar-nihohecy.jpg",
+            verified: false
+        },
+        content: "【新手必读｜先看这里】\n\n⚠️ 本页内容是《超时空辉夜姬！》同人相关模拟器演示，不代表真实 SNS。\n\n📝 你如果刚接触 SNS，建议按这个顺序来：\n0. 先看完这条教程推；如果你把它隐藏了，点击左侧「探索」可再次显示。\n1. 切到「更多」-> 先确认你在「编辑模式」。\n2. 先改账号，再发帖，再改回复，最后导出保存。\n\n【1）先认界面：三栏分别做什么】\n- 左侧：导航与工具入口（更多、模式切换、导入导出）\n- 中间：时间线与帖子详情（发帖、回复、编辑）\n- 右侧：搜索过滤、趋势词、推荐关注\n\n【2）账号系统怎么用（最重要）】\n- 浏览账号：决定左下角和个人区显示谁\n- 发帖账号：决定“你这条帖/回复”是谁发的\n- 入口：更多 -> 浏览账号 -> 账户管理\n推荐用法：先把角色账号都建好，再开始写剧情贴。\n\n【3）发一条新推（最常用）】\n- 在主页顶部输入框写正文\n- 可选：上传配图、填写时间、加翻译\n- 点「发帖」即可\n推荐用法：时间建议写完整（年/月/日/时/分），回看排序更清楚。\n\n【4）回复与楼中楼】\n- 点进某条帖子详情，在回复框发布回复\n- 对某条回复继续回复，就是楼中楼\n- 现在支持：回复配图 + 回复时间\n推荐用法：把“角色对话”拆成多层回复，剧情更像真实时间线。\n\n【5）编辑能力：你可以改哪些】\n- 文本：昵称、ID、正文、翻译文本、翻译来源、时间\n- 数字：评论/转推/点赞/浏览等计数\n- 图片：头像、帖子配图、回复配图\n注意：改“单条推头像”时，可勾选是否同步为账号头像。\n\n【6）搜索与过滤】\n- 右侧搜索支持：作者名、ID、正文、翻译、时间关键词\n推荐用法：长项目里用角色名或标签快速定位帖子。\n\n【7）导入导出与分发】\n- 导出数据：JSON（项目主格式，可导入恢复）\n- 导出HTML：静态快照（展示用）\n推荐用法：每次大改后导出一份 JSON 备份。\n\n【8）图片与存储说明（很关键）】\n- 项目状态存在浏览器本地存储（IndexedDB + localStorage）\n- 换浏览器/清缓存会丢失本地状态\n- 想给别人“第一次打开就看到同样内容”，请把默认图片放进项目 assets，并写入默认数据\n\n【推荐工作流（给新手）】\n1. 建账号 -> 2. 发主帖 -> 3. 补回复/楼中楼 -> 4. 调整数字与时间 -> 5. 导出 JSON 备份\n\n【同人声明与版权】\n- 同人设定说明：见 README\n- [@lofter：古法呛面馒头](https://gufaqiangmianmantou.lofter.com)\n- [@小红书：幼儿园老大](https://xhslink.com/m/GI5hv5bP5d)",
+        media: null,
+        time: "下午 1:00 · 2040年9月8日",
+        views: "1.2万",
+        stats: {
+            comments: 12,
+            retweets: 38,
+            likes: 226,
+            bookmarks: 119
+        },
+        translation: null,
+        replies: []
+    },
     {
         id: 1,
         user: {
@@ -348,6 +371,7 @@ function getDefaultState() {
                 'follow-avatar-2': 'assets/default/ui/follow-2.jpg',
                 'follow-avatar-3': 'assets/default/ui/follow-3.jpg'
             },
+            guideTweetHidden: false,
             defaultAuthorId: initialViewerId,
             composeAuthorId: initialViewerId
         }
@@ -378,6 +402,7 @@ function buildNormalizedState(defaults, savedState) {
                 ...(defaults.ui?.avatarFields || {}),
                 ...(savedState?.ui?.avatarFields || {})
             },
+            guideTweetHidden: savedState?.ui?.guideTweetHidden === true,
             defaultAuthorId: savedState?.ui?.defaultAuthorId || fallbackViewerId,
             composeAuthorId: savedState?.ui?.composeAuthorId || savedState?.ui?.defaultAuthorId || fallbackViewerId
         }
@@ -565,6 +590,12 @@ function setAppMode(mode) {
     saveUnifiedState(state);
 }
 
+function setGuideTweetHidden(hidden) {
+    const state = unifiedAppState || getDefaultState();
+    state.ui.guideTweetHidden = hidden === true;
+    saveUnifiedState(state);
+}
+
 currentData = cloneDeep(getDefaultState().tweets);
 appStateReadyPromise = loadUnifiedState()
     .then((state) => {
@@ -589,6 +620,7 @@ window.setComposeAuthorId = setComposeAuthorId;
 window.setAppMode = setAppMode;
 window.buildAccountIdByHandle = buildAccountIdByHandle;
 window.ensureAppStateReady = () => appStateReadyPromise || Promise.resolve(cloneDeep(unifiedAppState || getDefaultState()));
+window.setGuideTweetHidden = setGuideTweetHidden;
 
 function removeAccount(accountId) {
     const state = unifiedAppState || getDefaultState();
@@ -621,6 +653,7 @@ function replaceProjectState(payload) {
                 ...(defaults.ui?.avatarFields || {}),
                 ...(payload?.ui?.avatarFields || {})
             },
+            guideTweetHidden: payload?.ui?.guideTweetHidden === true,
             defaultAuthorId: payload?.ui?.defaultAuthorId || null,
             composeAuthorId: payload?.ui?.composeAuthorId || payload?.ui?.defaultAuthorId || null
         }

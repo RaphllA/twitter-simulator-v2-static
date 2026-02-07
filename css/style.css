@@ -1657,6 +1657,39 @@ button {
     position: relative;
 }
 
+.tweet-pin-label {
+    display: inline-flex;
+    align-items: center;
+    margin: 2px 0 8px 52px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.guide-hide-btn {
+    position: absolute;
+    top: 8px;
+    right: 36px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    background: rgba(15, 20, 25, 0.82);
+    font-size: 12px;
+    z-index: 10;
+    display: none;
+}
+
+.tweet-card:hover .guide-hide-btn {
+    display: inline-flex;
+}
+
+.tweet-link {
+    color: var(--text-link);
+    text-decoration: underline;
+    text-decoration-color: rgba(29, 155, 240, 0.5);
+    text-underline-offset: 2px;
+}
+
 /* ========================================
    闁告繂绉寸花鎻掝嚕韫囨凹鍟庨悹?
    ======================================== */

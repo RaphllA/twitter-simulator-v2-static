@@ -242,6 +242,7 @@ function renderTimeline() {
     container.innerHTML = '';
 
     const q = (timelineSearchQuery || '').trim().toLowerCase();
+    const ui = getUIState();
     let visibleTweets = !q ? [...currentData] : currentData.filter(tweet => {
         const hay = [
             tweet.user?.name || '',
@@ -253,9 +254,18 @@ function renderTimeline() {
         return hay.includes(q);
     });
 
-    if (getTimelineSortMode() === 'date') {
-        visibleTweets.sort((a, b) => parseTweetTimeToTimestamp(b.time) - parseTweetTimeToTimestamp(a.time));
+    if (ui?.guideTweetHidden) {
+        visibleTweets = visibleTweets.filter(tweet => !tweet.isGuide);
     }
+
+    visibleTweets.sort((a, b) => {
+        const pinDiff = (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0);
+        if (pinDiff !== 0) return pinDiff;
+        if (getTimelineSortMode() === 'date') {
+            return parseTweetTimeToTimestamp(b.time) - parseTweetTimeToTimestamp(a.time);
+        }
+        return 0;
+    });
 
     // 渲染推文列表
     visibleTweets.forEach(tweet => {
@@ -298,10 +308,13 @@ async function loadAsyncImages(container) {
 // 格式化文本（处理 hashtags 等）
 function formatText(text) {
     if (!text) return '';
-    // 简单的 hashtag 匹配：# 后接非空白字符
-    // 由于是模拟器，我们可以简单地匹配 # 开头到空格或换行结束
-    // 更新正则：增加平假名、片假名支持
-    return text.replace(/(^|\s)(#[\w\u4e00-\u9faf\u3040-\u309f\u30a0-\u30ff]+)/g, '$1<span class="hashtag">$2</span>');
+    let html = text;
+    html = html.replace(
+        /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+        '<a class="tweet-link" href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+    html = html.replace(/(^|\s)(#[\w\u4e00-\u9faf\u3040-\u309f\u30a0-\u30ff]+)/g, '$1<span class="hashtag">$2</span>');
+    return html;
 }
 
 function createTweetCard(tweet, isDetail = false) {
@@ -318,6 +331,8 @@ function createTweetCard(tweet, isDetail = false) {
                 e.target.closest('.tweet-media') ||
                 e.target.closest('.action-btn') ||
                 e.target.closest('.delete-btn') ||
+                e.target.closest('.guide-hide-btn') ||
+                e.target.closest('a') ||
                 e.target.closest('.translation-editor')) {
                 return;
             }
@@ -455,8 +470,16 @@ function createTweetCard(tweet, isDetail = false) {
             </div>
         `;
     } else {
+        const pinLabelHtml = tweet.isPinned
+            ? `<div class="tweet-pin-label">${getLocale() === 'ja-JP' ? '固定表示' : '置顶推文'}</div>`
+            : '';
+        const guideHideBtnHtml = tweet.isGuide
+            ? `<button class="guide-hide-btn editor-only" type="button" data-tweet-id="${tweet.id}">${getLocale() === 'ja-JP' ? 'この案内を隠す' : '隐藏本教程'}</button>`
+            : '';
         card.innerHTML = `
             <button class="delete-btn" onclick="deleteTweet(${tweet.id}); event.stopPropagation();">×</button>
+            ${guideHideBtnHtml}
+            ${pinLabelHtml}
             <div class="tweet-header">
                 <div class="tweet-avatar editable-avatar" data-tweet-id="${tweet.id}" data-field="avatar">
                     ${avatarHtml}
@@ -878,6 +901,12 @@ function setupEventListeners() {
         exploreNav.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (typeof window.setGuideTweetHidden === 'function') {
+                window.setGuideTweetHidden(false);
+            }
+            if (currentView === 'timeline') {
+                renderTimeline();
+            }
             toggleRightSidebarDrawer();
         });
     }
@@ -2981,6 +3010,21 @@ if (!window.__v3EventsBound) {
 
         if (!e.target.closest('#viewer-switcher-menu')) {
             closeViewerSwitcher();
+        }
+
+        const guideHideBtn = e.target.closest('.guide-hide-btn[data-tweet-id]');
+        if (guideHideBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof window.setGuideTweetHidden === 'function') {
+                window.setGuideTweetHidden(true);
+            }
+            if (currentView === 'timeline') {
+                renderTimeline();
+            } else {
+                showTimeline();
+            }
+            return;
         }
 
         const closeRelatedSortMenus = () => {
