@@ -944,7 +944,18 @@ button {
 
 .tweet-detail {
     padding: 12px 16px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: none;
+    position: relative;
+}
+
+.tweet-detail::after {
+    content: '';
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 0;
+    height: 1px;
+    background: var(--border-color);
 }
 
 .tweet-detail .tweet-header {
@@ -2318,6 +2329,13 @@ button {
     font-size: 12px;
     color: var(--accent-blue);
     background: transparent;
+}
+
+@media (max-width: 768px) {
+    .tweet-detail::after {
+        left: 12px;
+        right: 12px;
+    }
 }
 
 .profile-account-btn:hover {
