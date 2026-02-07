@@ -313,8 +313,14 @@ function loadUnifiedState() {
         accounts: mergedAccounts,
         ui: {
             mode: savedState?.ui?.mode === 'view' ? 'view' : 'edit',
-            textFields: { ...(savedState?.ui?.textFields || {}) },
-            avatarFields: { ...(savedState?.ui?.avatarFields || {}) },
+            textFields: {
+                ...(defaults.ui?.textFields || {}),
+                ...(savedState?.ui?.textFields || {})
+            },
+            avatarFields: {
+                ...(defaults.ui?.avatarFields || {}),
+                ...(savedState?.ui?.avatarFields || {})
+            },
             defaultAuthorId: savedState?.ui?.defaultAuthorId || fallbackViewerId,
             composeAuthorId: savedState?.ui?.composeAuthorId || savedState?.ui?.defaultAuthorId || fallbackViewerId
         }
