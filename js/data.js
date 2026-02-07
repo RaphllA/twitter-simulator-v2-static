@@ -6,19 +6,19 @@
  */
 
 // 数据版本号 - 每次更新默认数据时递增
-const DATA_VERSION = 9;
+const DATA_VERSION = 11;
 
 // 示例推文数据
 const tweetsData = [
     {
         id: 1,
         user: {
-            name: "ヤチヨ",
+            name: "ヤチヨ🌙",
             handle: "@yachi8000",
             avatar: "assets/default/avatars/avatar-yachiyo.jpg",
             verified: true
         },
-        content: "【お知らせ】\n皆さん！！ 大ニュースです！\n\nなんと私、かぐやちゃん、いろぷちゃんの三人で\n合同ライブを開催することになりました！！ 🎉🎉\n\n久しぶりにかぐちゃんとステージに立てるのが\n本当に楽しみにしています...！\n\n詳細は後日発表します！\nぜひ見に来てくださいね！ ✨\n\n#三人ライブ #ヤチヨ復帰 #かぐや #合同ライブ",
+        content: "【お知らせ】\n\n皆さん！！ 大ニュースです！\n\nなんと..私、かぐやちゃん、いろぷちゃんの三人で\n合同ライブを開催することになりました！！ 🎉🎉\n\n久しぶりにかぐやちゃんとステージに立てるのが\n本当に本当に嬉しいです...!\n\n詳細は後日発表します！\nぜひ見に来てくださいね！ ✨\n\n#三人ライブ #ヤチヨ #かぐや #いろぷ #合同ライブ",
         media: {
             type: "image",
             url: "assets/default/tweets/tweet-1-main.jpg",
@@ -34,18 +34,22 @@ const tweetsData = [
             likes: 780700,
             bookmarks: 62000
         },
-        translation: null,
+        translation: {
+            source: "日语",
+            text: "【通知】\n\n大家！！ 有大新闻！\n\n竟然...我、辉夜酱、彩P三人\n将要举办联合Live！！ 🎉🎉\n\n能够再次和辉夜酱一起站在舞台上\n真的真的太高兴了...！\n\n详情将在日后公布！\n请一定要来看哦！ ✨\n\n#三人Live #八千代 #辉夜 #彩叶 #联合Live",
+            visible: true
+        },
         replies: []
     },
     {
         id: 2,
         user: {
-            name: "月読ニュース",
+            name: "🌶️ 月読ニュース",
             handle: "@tsukuyomi_news",
             avatar: "assets/default/avatars/avatar-tsukuyomi-news.jpg",
             verified: true
         },
-        content: "【独占取材】東大具身知能研究所、世界初の画期的成果を達成\n\n酒寄いろぷ所長への独占インタビューによると、同研究所は人型ロボットの\n自律判断において驚異的なブレークスルーを実現したとのこと。\n\n「私たちの研究は、ロボットが人間のように自然に動き、考えることを可能に\nします」と酒寄所長は語った。\n\n#東大 #具身知能 #ロボット #AI研究 #酒寄いろぷ",
+        content: "【独占取材】東大具身知能研究所、世界初の画期的成果を達成\n\n酒寄いろぷ所長への独占インタビューによると、同研究所は人型ロボットの\n自律制御において、世界的なブレークスルーを実現したとのこと。\n\n「私たちの研究は、ロボットが人間のように自然に動き、考えることを可能\nにします」と酒寄所長は語った。\n\n#東大 #具身知能 #ロボット #AI研究 #酒寄いろぷ",
         media: {
             type: "image",
             url: "assets/default/tweets/tweet-2-main.jpg",
@@ -61,7 +65,11 @@ const tweetsData = [
             likes: 47750,
             bookmarks: 9130
         },
-        translation: null,
+        translation: {
+            source: "日语",
+            text: "【独家采访】东大具身智能研究所取得世界首创的突破性成果\n\n根据对酒寄彩叶所长的独家采访，该研究所在人形机器人自主控制领域实现了世界级的突破。\n\n“我们的研究使机器人能够像人类一样自然地移动和思考”，酒寄所长如此说道。\n\n#东大 #具身智能 #机器人 #AI研究 #酒寄彩叶",
+            visible: true
+        },
         replies: []
     },
     {
@@ -72,7 +80,7 @@ const tweetsData = [
             avatar: "assets/default/avatars/avatar-irokaguforever.jpg",
             verified: false
         },
-        content: "やっぱり私はいろかぐなんだよな\n\nいろヤチヨも尊いんだけど、やっぱりいろかぐには敵わない\nヤチヨごめん。\n\nだってさ、いろぷちゃん総受けじゃん？？\nかぐやは完全に\nこの組み合わせ性癖すぎて毎日死んでる\n推しカプが尊すぎて生きるのが辛い\n\n#いろかぐ #彩葉 #いろぷ受け #かぐや攻め #尊い",
+        content: "やっぱり私はいろかぐなんだよな...\n\nいろヤチヨも良いんだけど、やっぱりいろかぐには敵わない\nヤチヨごめん...😭\n\nだってさ、いろぷちゃん絶対0じゃん？？\nかぐやは完全に1だし\n\nこの組み合わせ最高すぎて毎日死んでる\n推しカプが尊すぎて生きるのが辛い\n\n#いろかぐ #彩輝 #いろぷ受け #かぐや攻め #尊い",
         media: null,
         time: "下午 11:23 · 2040年9月11日",
         views: "847",
@@ -82,7 +90,11 @@ const tweetsData = [
             likes: 45,
             bookmarks: 2
         },
-        translation: null,
+        translation: {
+            source: "日语",
+            text: "果然我还是站彩辉啊...\n\n彩八千也不错，但果然还是比不过彩辉\n八千代对不起...😭\n\n因为，彩叶酱绝对是0吧？？\n辉夜完全是1啊\n\n这个组合太棒了，每天都在死去\n推的CP太神圣了，活着好辛苦\n\n#彩辉 #彩叶受 #辉夜攻 #尊死",
+            visible: true
+        },
         replies: [
             {
                 id: 301,
@@ -90,14 +102,18 @@ const tweetsData = [
                     name: "かぐや",
                     handle: "@kaguya",
                     avatar: "assets/default/avatars/avatar-kaguya.jpg",
-                    verified: false
+                    verified: true
                 },
-                content: "わかるかわち！！ いままでずっとずっと、私も他のヤツよりいろかぐだと思いますっ！！！\n！！！！（ていうかこれ誰でも尊いでしょ）？？？",
-                translation: null,
+                content: "わかるわかる！！！ さすがですね〜！ 私も絶対かぐやは1だと思いますっ！！ ✨ ていうか当たり前じゃないですかっ！？！？",
+                translation: {
+                    source: "日语",
+                    text: "懂懂懂！！！ 不愧是你～！ 我也觉得辉夜绝对是1！！ ✨ 这不是理所当然的吗！？！？",
+                    visible: true
+                },
                 time: "下午 11:25 · 2040年9月11日",
                 stats: {
-                    comments: 2,
-                    retweets: 4,
+                    comments: 0,
+                    retweets: 0,
                     likes: 18,
                     bookmarks: 0,
                     views: 18
@@ -111,13 +127,17 @@ const tweetsData = [
                     avatar: "assets/default/avatars/avatar-irokaguforever.jpg",
                     verified: false
                 },
-                content: "え？？？ ご本人？？？？？",
-                translation: null,
+                content: "え？？？ ご本人？？？",
+                translation: {
+                    source: "日语",
+                    text: "诶？？？ 本人？？？",
+                    visible: true
+                },
                 time: "下午 11:26 · 2040年9月11日",
                 stats: {
                     comments: 0,
-                    retweets: 1,
-                    likes: 14,
+                    retweets: 0,
+                    likes: 1,
                     bookmarks: 0,
                     views: 14
                 }
@@ -128,15 +148,19 @@ const tweetsData = [
                     name: "かぐや",
                     handle: "@kaguya",
                     avatar: "assets/default/avatars/avatar-kaguya.jpg",
-                    verified: false
+                    verified: true
                 },
-                content: "本人じゃないです！！ うるさくてすみません！！",
-                translation: null,
+                content: "本人じゃないです！！！ 忘れてください！！！",
+                translation: {
+                    source: "日语",
+                    text: "不是本人！！！ 请务必忘掉！！！",
+                    visible: true
+                },
                 time: "下午 11:27 · 2040年9月11日",
                 stats: {
                     comments: 1,
-                    retweets: 5,
-                    likes: 23,
+                    retweets: 0,
+                    likes: 5,
                     bookmarks: 0,
                     views: 23
                 }
@@ -149,15 +173,19 @@ const tweetsData = [
                     avatar: "assets/default/avatars/avatar-irokaguforever.jpg",
                     verified: false
                 },
-                content: "じゃあ、かぐやちゃんやっぱり攻めだな！！",
-                translation: null,
+                content: "じゃあ、かぐやちゃんやっぱり攻めだよね！！！",
+                translation: {
+                    source: "日语",
+                    text: "所以，辉夜酱真的是1对吧！！！",
+                    visible: true
+                },
                 time: "下午 11:28 · 2040年9月11日",
                 stats: {
                     comments: 0,
                     retweets: 0,
-                    likes: 5,
+                    likes: 0,
                     bookmarks: 0,
-                    views: 5
+                    views: 0
                 }
             }
         ]
@@ -187,6 +215,26 @@ function cloneDeep(obj) {
 
 function mergeDeep(base, override) {
     if (override === undefined || override === null) return cloneDeep(base);
+    if (Array.isArray(base) && Array.isArray(override)) {
+        const isObjWithId = (item) => item && typeof item === 'object' && !Array.isArray(item) && item.id !== undefined && item.id !== null;
+        const canMergeById = base.every(isObjWithId) && override.every(isObjWithId);
+        if (!canMergeById) return cloneDeep(override);
+
+        const overrideMap = new Map(override.map(item => [item.id, item]));
+        const baseIds = new Set(base.map(item => item.id));
+
+        const merged = base.map(baseItem => {
+            const overrideItem = overrideMap.get(baseItem.id);
+            if (!overrideItem) return cloneDeep(baseItem);
+            return mergeDeep(baseItem, overrideItem);
+        });
+
+        for (const overrideItem of override) {
+            if (!baseIds.has(overrideItem.id)) merged.push(cloneDeep(overrideItem));
+        }
+        return merged;
+    }
+
     if (base === null || typeof base !== 'object' || Array.isArray(base)) return cloneDeep(override);
     if (typeof override !== 'object' || Array.isArray(override)) return cloneDeep(override);
 
@@ -257,13 +305,35 @@ function mergeAccounts(inferredAccounts, savedAccounts) {
     for (const account of (Array.isArray(savedAccounts) ? savedAccounts : [])) {
         if (!account || !account.id) continue;
         const base = merged.get(account.id) || {};
-        merged.set(account.id, { ...base, ...account });
+        const next = { ...base, ...account };
+        if ((account.avatar === '' || account.avatar === null || account.avatar === undefined) && base.avatar) {
+            next.avatar = base.avatar;
+        }
+        merged.set(account.id, next);
     }
     return Array.from(merged.values());
 }
 
+const DEFAULT_EXTRA_ACCOUNTS = [
+    {
+        id: buildAccountIdByHandle('@nihoheYCY'),
+        name: '色々',
+        handle: '@nihoheYCY',
+        avatar: 'assets/default/avatars/avatar-nihohecy.jpg',
+        verified: false
+    }
+];
+
 function getDefaultState() {
     const initialAccounts = inferAccountsFromTweets(cloneDeep(tweetsData));
+    for (const extra of DEFAULT_EXTRA_ACCOUNTS) {
+        if (!initialAccounts.some(acc => acc.id === extra.id)) {
+            initialAccounts.push({
+                ...extra,
+                updatedAt: Date.now()
+            });
+        }
+    }
     const initialViewerId = initialAccounts[0]?.id || null;
 
     return {

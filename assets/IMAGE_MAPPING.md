@@ -10,6 +10,7 @@ Folder: `assets/default/avatars/`
 - `avatar-tsukuyomi-news.jpg` -> 月読ニュース / `@tsukuyomi_news`
 - `avatar-irokaguforever.jpg` -> 彩輝激推し / `@irokaguforever`
 - `avatar-kaguya.jpg` -> かぐや / `@kaguya`
+- `avatar-nihohecy.jpg` -> 色々 / `@nihoheYCY` (optional)
 
 ## 2) Tweet media images (used by default tweets)
 
@@ -34,4 +35,3 @@ Folder: `assets/default/ui/`
 - Avatar: square (at least `400x400`), JPG/PNG/WebP
 - Tweet media: ratio close to `16:9` (at least `1280x720`)
 - Use lowercase + hyphen names to avoid path/case issues
-

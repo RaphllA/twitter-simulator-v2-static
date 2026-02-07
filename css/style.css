@@ -1974,6 +1974,7 @@ button {
     flex-direction: column;
     gap: 8px;
     flex: 1;
+    min-width: 0;
 }
 
 .reply-account-select {
@@ -1983,6 +1984,63 @@ button {
     border-radius: 9999px;
     padding: 8px 12px;
     font-size: 13px;
+}
+
+.reply-compose-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.reply-time-fields {
+    flex: 1 1 320px;
+    min-width: 320px;
+    max-width: 100%;
+}
+
+.composer-media-preview,
+.reply-media-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 8px;
+}
+
+.composer-media-chip {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    background: #0f1419;
+    aspect-ratio: 1 / 1;
+}
+
+.composer-media-chip img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.composer-media-remove-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(15, 20, 25, 0.72);
+    color: #fff;
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.composer-media-remove-btn:hover {
+    background: rgba(249, 24, 128, 0.78);
 }
 
 .compose-extra {
@@ -2016,11 +2074,13 @@ button {
     gap: 8px;
     flex: 1 1 auto;
     min-width: 0;
+    flex-wrap: wrap;
 }
 
 .compose-meta-left .composer-account-select {
-    flex: 1 1 auto;
+    flex: 1 1 220px;
     min-width: 0;
+    max-width: none;
 }
 
 .compose-time-input {
@@ -2039,7 +2099,10 @@ button {
     border: 1px solid var(--border-color);
     border-radius: 999px;
     padding: 5px 9px;
-    flex-shrink: 0;
+    flex: 1 1 320px;
+    min-width: 320px;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .compose-time-part {
@@ -2063,6 +2126,7 @@ button {
     gap: 2px;
     color: var(--text-secondary);
     font-size: 12px;
+    flex-shrink: 0;
 }
 
 .compose-time-piece span {
@@ -2305,6 +2369,20 @@ button {
     font-size: 12px;
     color: var(--text-secondary);
 }
+
+.modal-check-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.modal-check-option input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+}
 @media (max-width: 1280px) {
     .main-content {
         width: min(100%, 620px);
@@ -2326,6 +2404,12 @@ button {
 
     .main-header h1 {
         font-size: 18px;
+    }
+
+    .compose-time-fields,
+    .reply-time-fields {
+        min-width: 0;
+        flex: 1 1 100%;
     }
 }
 
@@ -2787,7 +2871,7 @@ button {
 
 #tweet-detail-view .nested-reply-compose {
     display: none;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     margin-top: 10px;
     margin-left: 0;
@@ -2818,6 +2902,13 @@ button {
 
 #tweet-detail-view .nested-reply-input::placeholder {
     color: var(--text-secondary);
+}
+
+#tweet-detail-view .nested-reply-tools {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 8px;
 }
 
 #tweet-detail-view .nested-replies {

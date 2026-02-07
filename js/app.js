@@ -27,6 +27,8 @@ let editingAccountId = null;
 let cropBoxState = { x: 0, y: 0, width: 0, height: 0 };
 let cropPointerState = null;
 const TIMELINE_SORT_KEY = 'tukuyomi-timeline-sort';
+let composeDraftMediaIds = [];
+const replyDraftMap = new Map();
 
 // ========================================
 // Mobile overlays (right drawer + tools)
@@ -536,7 +538,20 @@ function createReplyThread(reply, tweetId) {
         <div class="tweet-avatar editable-avatar" data-field="reply-compose-avatar">
             <div class="avatar-placeholder">我</div>
         </div>
-        <input type="text" class="nested-reply-input" data-tweet-id="${tweetId}" data-parent-reply-id="${reply.id}" placeholder="${getLocale() === 'ja-JP' ? '返信を投稿' : '发布你的回复'}">
+        <div class="nested-reply-tools">
+            <input type="text" class="nested-reply-input" data-tweet-id="${tweetId}" data-parent-reply-id="${reply.id}" placeholder="${getLocale() === 'ja-JP' ? '返信を投稿' : '发布你的回复'}">
+            <div class="reply-compose-controls editor-only" data-tweet-id="${tweetId}" data-parent-reply-id="${reply.id}">
+                <button type="button" class="inline-mini-btn subtle-btn reply-media-upload-btn" data-tweet-id="${tweetId}" data-parent-reply-id="${reply.id}">${t('uploadMedia')}</button>
+                <div class="compose-time-fields reply-time-fields" title="${t('postTime')}">
+                    <label class="compose-time-piece"><input class="compose-time-part year" data-part="year" inputmode="numeric" maxlength="4"><span>年</span></label>
+                    <label class="compose-time-piece"><input class="compose-time-part" data-part="month" inputmode="numeric" maxlength="2"><span>月</span></label>
+                    <label class="compose-time-piece"><input class="compose-time-part" data-part="day" inputmode="numeric" maxlength="2"><span>日</span></label>
+                    <label class="compose-time-piece"><input class="compose-time-part" data-part="hour" inputmode="numeric" maxlength="2"><span>时</span></label>
+                    <label class="compose-time-piece"><input class="compose-time-part" data-part="minute" inputmode="numeric" maxlength="2"><span>分</span></label>
+                </div>
+            </div>
+            <div class="reply-media-preview" data-tweet-id="${tweetId}" data-parent-reply-id="${reply.id}" style="display:none"></div>
+        </div>
         <button class="reply-btn nested-reply-btn" type="button" data-tweet-id="${tweetId}" data-parent-reply-id="${reply.id}" disabled>回复</button>
     `;
     thread.appendChild(nestedCompose);
@@ -546,13 +561,20 @@ function createReplyThread(reply, tweetId) {
     const updateNestedState = () => {
         if (!nestedInput || !nestedBtn) return;
         const hasText = (nestedInput.value || '').trim().length > 0;
-        const canPost = appMode !== 'view' && hasText;
+        const hasMedia = getReplyDraft(tweetId, reply.id).mediaIds.length > 0;
+        const canPost = appMode !== 'view' && (hasText || hasMedia);
         nestedBtn.disabled = !canPost;
         nestedBtn.classList.toggle('active', canPost);
         thread.classList.toggle('has-nested', canPost || (reply.replies && reply.replies.length > 0) || nestedCompose.classList.contains('active'));
     };
     nestedInput?.addEventListener('input', updateNestedState);
+    nestedCompose.querySelectorAll('.compose-time-part').forEach(input => {
+        input.addEventListener('input', () => {
+            input.value = (input.value || '').replace(/\D/g, '');
+        });
+    });
     updateNestedState();
+    renderReplyMediaPreview(tweetId, reply.id);
 
     const nestedReplies = document.createElement('div');
     nestedReplies.className = 'nested-replies';
@@ -603,6 +625,17 @@ function renderTweetDetail(tweetId) {
                 ${buildInlineAccountOptions(getComposeAccountId())}
             </select>
             <input type="text" class="reply-input" data-tweet-id="${tweetId}" placeholder="${getLocale() === 'ja-JP' ? '返信を投稿' : '发布你的回复'}">
+            <div class="reply-compose-controls editor-only" data-tweet-id="${tweetId}">
+                <button type="button" class="inline-mini-btn subtle-btn reply-media-upload-btn" data-tweet-id="${tweetId}">${t('uploadMedia')}</button>
+                <div class="compose-time-fields reply-time-fields" title="${t('postTime')}">
+                    <label class="compose-time-piece"><input class="compose-time-part year" data-part="year" inputmode="numeric" maxlength="4"><span>年</span></label>
+                    <label class="compose-time-piece"><input class="compose-time-part" data-part="month" inputmode="numeric" maxlength="2"><span>月</span></label>
+                    <label class="compose-time-piece"><input class="compose-time-part" data-part="day" inputmode="numeric" maxlength="2"><span>日</span></label>
+                    <label class="compose-time-piece"><input class="compose-time-part" data-part="hour" inputmode="numeric" maxlength="2"><span>时</span></label>
+                    <label class="compose-time-piece"><input class="compose-time-part" data-part="minute" inputmode="numeric" maxlength="2"><span>分</span></label>
+                </div>
+            </div>
+            <div class="reply-media-preview" data-tweet-id="${tweetId}" style="display:none"></div>
         </div>
         <button class="reply-btn" data-tweet-id="${tweetId}">回复</button>
     `;
@@ -614,7 +647,8 @@ function renderTweetDetail(tweetId) {
     const updateReplySubmitState = () => {
         if (!replyTextInput || !replySubmitBtn) return;
         const hasText = (replyTextInput.value || '').trim().length > 0;
-        const canPost = appMode !== 'view' && hasText;
+        const hasMedia = getReplyDraft(tweetId, null).mediaIds.length > 0;
+        const canPost = appMode !== 'view' && (hasText || hasMedia);
         replySubmitBtn.disabled = !canPost;
         replySubmitBtn.classList.toggle('active', canPost);
     };
@@ -631,7 +665,13 @@ function renderTweetDetail(tweetId) {
         });
     }
     if (replySubmitBtn) replySubmitBtn.disabled = true;
+    replyInput.querySelectorAll('.compose-time-part').forEach(input => {
+        input.addEventListener('input', () => {
+            input.value = (input.value || '').replace(/\D/g, '');
+        });
+    });
     updateReplySubmitState();
+    renderReplyMediaPreview(tweetId);
 
     // 回复列表
     if (tweet.replies && tweet.replies.length > 0) {
@@ -710,6 +750,24 @@ function createReplyCard(reply, tweetId) {
         `;
     }
 
+    let mediaHtml = '';
+    const mediaImages = getTweetMediaImages(reply);
+    if (mediaImages.length) {
+        mediaHtml = `
+            <div class="tweet-media ${getMediaLayoutClass(mediaImages.length)}">
+                <div class="tweet-media-grid">
+                    ${mediaImages.map((imageRef, index) => `
+                        <div class="tweet-media-item">
+                            ${isIndexedDBImageId(imageRef)
+                    ? `<img data-image-id="${imageRef}" alt="Reply media ${index + 1}" class="async-image">`
+                    : `<img src="${imageRef}" alt="Reply media ${index + 1}">`}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     card.innerHTML = `
         <button class="delete-btn" onclick="deleteReply(${tweetId}, ${reply.id}); event.stopPropagation();">×</button>
         <div class="tweet-header">
@@ -726,6 +784,7 @@ function createReplyCard(reply, tweetId) {
                 <div class="tweet-content editable" data-tweet-id="${tweetId}" data-reply-id="${reply.id}" data-field="content">${formatText(reply.content)}</div>
                 ${replyTranslationEditorHtml}
                 ${translationHtml}
+                ${mediaHtml}
                 <div class="tweet-actions">
                     <button class="action-btn comment reply-thread-toggle-btn" type="button" data-action="toggle-nested-reply" data-tweet-id="${tweetId}" data-reply-id="${reply.id}">
                         <svg viewBox="0 0 24 24"><path d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z"/></svg>
@@ -763,7 +822,7 @@ function createReplyCard(reply, tweetId) {
 
 function setupEventListeners() {
     // 点击可编辑文本
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', async (e) => {
         if (e.target.closest('.media-remove-btn') || e.target.closest('.translation-editor')) {
             e.stopPropagation();
             return;
@@ -878,6 +937,162 @@ function getMediaLayoutClass(imageCount) {
     if (imageCount === 3) return 'tweet-media-count-3';
     if (imageCount === 2) return 'tweet-media-count-2';
     return 'tweet-media-count-1';
+}
+
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('read file failed'));
+        reader.readAsDataURL(file);
+    });
+}
+
+async function pickImagesAndStore(maxCount = 4) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = maxCount > 1;
+
+    const files = await new Promise((resolve) => {
+        input.onchange = () => resolve(Array.from(input.files || []));
+        input.click();
+    });
+
+    if (!files.length) return [];
+
+    const selected = files.slice(0, Math.max(1, maxCount));
+    const result = [];
+    for (const file of selected) {
+        try {
+            const dataUrl = await readFileAsDataUrl(file);
+            if (!dataUrl) continue;
+            const id = await ImageStore.saveImage(dataUrl);
+            if (id) result.push(id);
+        } catch (e) {
+            console.error('Failed to store selected image:', e);
+        }
+    }
+    return result;
+}
+
+function getReplyDraftKey(tweetId, parentReplyId = null) {
+    return parentReplyId ? `tweet_${tweetId}_reply_${parentReplyId}` : `tweet_${tweetId}_root`;
+}
+
+function getReplyDraft(tweetId, parentReplyId = null) {
+    const key = getReplyDraftKey(tweetId, parentReplyId);
+    if (!replyDraftMap.has(key)) {
+        replyDraftMap.set(key, { mediaIds: [] });
+    }
+    return replyDraftMap.get(key);
+}
+
+function clearReplyDraft(tweetId, parentReplyId = null) {
+    const key = getReplyDraftKey(tweetId, parentReplyId);
+    replyDraftMap.delete(key);
+}
+
+function shouldSyncAvatarFromAccount(user) {
+    return user?.avatarLinked !== false;
+}
+
+function collectTimeFromFields(container) {
+    if (!container) return '';
+    const pick = (part) => (container.querySelector(`.compose-time-part[data-part="${part}"]`)?.value || '').trim();
+    const y = pick('year');
+    const m = pick('month');
+    const d = pick('day');
+    const h = pick('hour');
+    const min = pick('minute');
+    if (!y && !m && !d && !h && !min) return '';
+    if (!y || !m || !d) return '';
+
+    const yi = Number(y);
+    const mi = Number(m);
+    const di = Number(d);
+    if (!Number.isFinite(yi) || !Number.isFinite(mi) || !Number.isFinite(di)) return '';
+    if (mi < 1 || mi > 12 || di < 1 || di > 31) return '';
+
+    if (!h && !min) return `${yi}年${mi}月${di}日`;
+    if (!h || !min) return '';
+
+    const hi = Number(h);
+    const mini = Number(min);
+    if (!Number.isFinite(hi) || !Number.isFinite(mini)) return '';
+    if (hi < 0 || hi > 23 || mini < 0 || mini > 59) return '';
+
+    const ampm = hi >= 12 ? '下午' : '上午';
+    const hour12 = hi % 12 === 0 ? 12 : hi % 12;
+    const mm = String(mini).padStart(2, '0');
+    return `${ampm} ${hour12}:${mm} · ${yi}年${mi}月${di}日`;
+}
+
+function renderComposeMediaPreview() {
+    const host = document.getElementById('compose-media-preview');
+    if (!host) return;
+
+    if (!composeDraftMediaIds.length) {
+        host.innerHTML = '';
+        host.style.display = 'none';
+        return;
+    }
+
+    host.style.display = '';
+    host.innerHTML = composeDraftMediaIds.map((id, index) => `
+        <div class="composer-media-chip">
+            <img data-image-id="${id}" class="async-image" alt="compose media ${index + 1}">
+            <button type="button" class="composer-media-remove-btn" data-media-index="${index}" title="${t('removeMediaItem')}">×</button>
+        </div>
+    `).join('');
+
+    loadAsyncImages(host);
+}
+
+function renderReplyMediaPreview(tweetId, parentReplyId = null) {
+    const selector = parentReplyId
+        ? `.reply-media-preview[data-tweet-id="${tweetId}"][data-parent-reply-id="${parentReplyId}"]`
+        : `.reply-media-preview[data-tweet-id="${tweetId}"]:not([data-parent-reply-id])`;
+    const host = document.querySelector(selector);
+    if (!host) return;
+
+    const draft = getReplyDraft(tweetId, parentReplyId);
+    if (!draft.mediaIds.length) {
+        host.innerHTML = '';
+        host.style.display = 'none';
+        refreshReplySubmitState(tweetId, parentReplyId);
+        return;
+    }
+
+    host.style.display = '';
+    host.innerHTML = draft.mediaIds.map((id, index) => `
+        <div class="composer-media-chip">
+            <img data-image-id="${id}" class="async-image" alt="reply media ${index + 1}">
+            <button type="button" class="composer-media-remove-btn reply-media-remove-btn" data-media-index="${index}" data-tweet-id="${tweetId}" ${parentReplyId ? `data-parent-reply-id="${parentReplyId}"` : ''} title="${t('removeMediaItem')}">×</button>
+        </div>
+    `).join('');
+
+    loadAsyncImages(host);
+    refreshReplySubmitState(tweetId, parentReplyId);
+}
+
+function refreshReplySubmitState(tweetId, parentReplyId = null) {
+    const inputSelector = parentReplyId
+        ? `.nested-reply-input[data-tweet-id="${tweetId}"][data-parent-reply-id="${parentReplyId}"]`
+        : `.reply-input[data-tweet-id="${tweetId}"]`;
+    const buttonSelector = parentReplyId
+        ? `.nested-reply-btn[data-tweet-id="${tweetId}"][data-parent-reply-id="${parentReplyId}"]`
+        : `.reply-btn[data-tweet-id="${tweetId}"]:not(.nested-reply-btn)`;
+
+    const input = document.querySelector(inputSelector);
+    const button = document.querySelector(buttonSelector);
+    if (!button) return;
+
+    const hasText = !!((input?.value || '').trim());
+    const hasMedia = getReplyDraft(tweetId, parentReplyId).mediaIds.length > 0;
+    const canPost = appMode !== 'view' && (hasText || hasMedia);
+    button.disabled = !canPost;
+    button.classList.toggle('active', canPost);
 }
 
 // ========================================
@@ -1007,6 +1222,12 @@ function openImageModal(multiple = false) {
     modal.classList.add('active');
     const stage = document.getElementById('crop-stage');
     if (stage) stage.classList.remove('has-image');
+
+    const syncWrap = document.getElementById('sync-account-avatar-option-wrap');
+    const syncInput = document.getElementById('sync-account-avatar-option');
+    const showSyncOption = editingField === 'avatar' && editingTweetId !== null;
+    if (syncWrap) syncWrap.style.display = showSyncOption ? 'flex' : 'none';
+    if (syncInput) syncInput.checked = false;
 }
 
 async function loadFileAsDataURL(file) {
@@ -1064,7 +1285,7 @@ function buildCroppedDataURL(img, crop, outWidth, outHeight) {
 }
 
 function isCropRatioLocked() {
-    return imageEditMode === 'avatar';
+    return false;
 }
 
 function renderCropPreview() {
@@ -1315,7 +1536,7 @@ async function confirmImage() {
 
     try {
         const normalizedCrop = getNormalizedCropBox();
-        const outWidthBase = imageEditMode === 'avatar' ? 512 : 1600;
+        const longSideBase = imageEditMode === 'avatar' ? 768 : 1600;
 
         const processedImageIds = [];
         for (const file of files.slice(0, imageEditMode === 'media' ? 4 : 1)) {
@@ -1328,8 +1549,15 @@ async function confirmImage() {
             });
             const cropRect = getImageCropRectFromNormalized(img, normalizedCrop);
             const cropRatio = Math.max(0.2, cropRect.sw / Math.max(1, cropRect.sh));
-            const outWidth = outWidthBase;
-            const outHeight = imageEditMode === 'avatar' ? 512 : Math.max(200, Math.round(outWidth / cropRatio));
+            let outWidth = longSideBase;
+            let outHeight = longSideBase;
+            if (cropRatio >= 1) {
+                outWidth = longSideBase;
+                outHeight = Math.max(200, Math.round(longSideBase / cropRatio));
+            } else {
+                outHeight = longSideBase;
+                outWidth = Math.max(200, Math.round(longSideBase * cropRatio));
+            }
             const cropped = buildCroppedDataURL(img, cropRect, outWidth, outHeight);
             const imageId = await ImageStore.saveImage(cropped);
             processedImageIds.push(imageId);
@@ -1354,7 +1582,20 @@ async function confirmImage() {
             setUIAvatarField(editingField, processedImageIds[0]);
             loadAsyncImages(document);
         } else if (editingField === 'avatar' || editingField.includes('avatar')) {
+            const targetTweet = currentData.find(t => t.id === editingTweetId);
+            const targetUser = editingReplyId ? findReplyById(targetTweet, editingReplyId)?.user : targetTweet?.user;
             updateData(editingTweetId, editingReplyId, 'avatar', processedImageIds[0]);
+
+            const accountId = targetUser?.accountId || null;
+            const account = accountId ? getAccounts().find(a => a.id === accountId) : null;
+            if (account) {
+                const shouldSyncToAccount = !!document.getElementById('sync-account-avatar-option')?.checked;
+                if (shouldSyncToAccount) {
+                    const updated = upsertAccount({ ...account, avatar: processedImageIds[0] });
+                    if (targetUser) targetUser.avatarLinked = true;
+                    applyAccountChangesToTweets(updated);
+                }
+            }
         }
 
         if (currentView === 'timeline') {
@@ -1438,6 +1679,7 @@ function updateData(tweetId, replyId, field, value) {
                 break;
             case 'avatar':
                 reply.user.avatar = value;
+                reply.user.avatarLinked = false;
                 break;
             case 'comments':
                 reply.stats.comments = parseNumber(value);
@@ -1481,6 +1723,7 @@ function updateData(tweetId, replyId, field, value) {
                 break;
             case 'avatar':
                 tweet.user.avatar = value;
+                tweet.user.avatarLinked = false;
                 break;
             case 'views':
                 tweet.views = value;
@@ -2043,7 +2286,24 @@ function ensureComposeControls() {
         });
     }
 
+    const composeImageBtn = document.querySelector('.compose-icons .compose-icon');
+    if (composeImageBtn && !composeImageBtn.dataset.boundUpload) {
+        composeImageBtn.dataset.boundUpload = '1';
+        composeImageBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (appMode === 'view') return;
+            const remain = Math.max(0, 4 - composeDraftMediaIds.length);
+            if (remain <= 0) return;
+            const ids = await pickImagesAndStore(remain);
+            if (!ids.length) return;
+            composeDraftMediaIds = [...composeDraftMediaIds, ...ids].slice(0, 4);
+            renderComposeMediaPreview();
+            updateComposeSubmitState();
+        });
+    }
+
     if (document.getElementById('compose-meta-tools')) {
+        renderComposeMediaPreview();
         updateComposeSubmitState();
         return;
     }
@@ -2056,16 +2316,17 @@ function ensureComposeControls() {
             <div class="compose-meta-left">
                 <select id="composer-account-select" class="composer-account-select"></select>
                 <div class="compose-time-fields" id="compose-time-fields" title="${t('postTime')}">
-                    <label class="compose-time-piece"><input id="compose-time-year" class="compose-time-part year" inputmode="numeric" maxlength="4"><span>年</span></label>
-                    <label class="compose-time-piece"><input id="compose-time-month" class="compose-time-part" inputmode="numeric" maxlength="2"><span>月</span></label>
-                    <label class="compose-time-piece"><input id="compose-time-day" class="compose-time-part" inputmode="numeric" maxlength="2"><span>日</span></label>
-                    <label class="compose-time-piece"><input id="compose-time-hour" class="compose-time-part" inputmode="numeric" maxlength="2"><span>时</span></label>
-                    <label class="compose-time-piece"><input id="compose-time-minute" class="compose-time-part" inputmode="numeric" maxlength="2"><span>分</span></label>
+                    <label class="compose-time-piece"><input id="compose-time-year" class="compose-time-part year" data-part="year" inputmode="numeric" maxlength="4"><span>年</span></label>
+                    <label class="compose-time-piece"><input id="compose-time-month" class="compose-time-part" data-part="month" inputmode="numeric" maxlength="2"><span>月</span></label>
+                    <label class="compose-time-piece"><input id="compose-time-day" class="compose-time-part" data-part="day" inputmode="numeric" maxlength="2"><span>日</span></label>
+                    <label class="compose-time-piece"><input id="compose-time-hour" class="compose-time-part" data-part="hour" inputmode="numeric" maxlength="2"><span>时</span></label>
+                    <label class="compose-time-piece"><input id="compose-time-minute" class="compose-time-part" data-part="minute" inputmode="numeric" maxlength="2"><span>分</span></label>
                 </div>
             </div>
             <button id="compose-translation-toggle-btn" class="inline-mini-btn subtle-btn compose-translation-btn" type="button">${t('withTranslation')}</button>
         </div>
         <textarea id="compose-translation-text" class="compose-translation-input" placeholder="翻译文本" style="display:none"></textarea>
+        <div id="compose-media-preview" class="composer-media-preview" style="display:none"></div>
     `;
 
     area.insertBefore(box, area.querySelector('.compose-tools'));
@@ -2088,6 +2349,7 @@ function ensureComposeControls() {
         submitBtn.onclick = submitComposeTweet;
         submitBtn.disabled = true;
     }
+    renderComposeMediaPreview();
     updateComposeSubmitState();
 }
 
@@ -2102,8 +2364,10 @@ function updateComposeSubmitState() {
     const submitBtn = document.querySelector('.compose-submit-btn');
     if (!submitBtn) return;
     const hasText = getComposeInputText().length > 0;
-    submitBtn.classList.toggle('active', hasText);
-    submitBtn.disabled = !hasText;
+    const hasMedia = composeDraftMediaIds.length > 0;
+    const canPost = hasText || hasMedia;
+    submitBtn.classList.toggle('active', canPost);
+    submitBtn.disabled = !canPost;
 }
 
 function fillAccountSelectors() {
@@ -2153,49 +2417,17 @@ function getComposeAccountId() {
 function submitComposeTweet() {
     const contentInput = document.getElementById('compose-editor-input');
     const select = document.getElementById('composer-account-select');
-    const yearInput = document.getElementById('compose-time-year');
-    const monthInput = document.getElementById('compose-time-month');
-    const dayInput = document.getElementById('compose-time-day');
-    const hourInput = document.getElementById('compose-time-hour');
-    const minuteInput = document.getElementById('compose-time-minute');
+    const timeFields = document.getElementById('compose-time-fields');
     const transToggleBtn = document.getElementById('compose-translation-toggle-btn');
     const transText = document.getElementById('compose-translation-text');
 
     const content = getComposeInputText();
-    if (!content) return;
+    if (!content && composeDraftMediaIds.length === 0) return;
 
     const accountId = select?.value || getComposeAccountId();
     const account = getAccounts().find(a => a.id === accountId);
 
-    const buildManualTimeText = () => {
-        const y = (yearInput?.value || '').trim();
-        const m = (monthInput?.value || '').trim();
-        const d = (dayInput?.value || '').trim();
-        const h = (hourInput?.value || '').trim();
-        const min = (minuteInput?.value || '').trim();
-        if (!y && !m && !d && !h && !min) return '';
-        if (!y || !m || !d) return '';
-
-        const yi = Number(y);
-        const mi = Number(m);
-        const di = Number(d);
-        if (!Number.isFinite(yi) || !Number.isFinite(mi) || !Number.isFinite(di)) return '';
-        if (mi < 1 || mi > 12 || di < 1 || di > 31) return '';
-
-        // Date-only is allowed. If either hour/minute is present, require both.
-        if (!h && !min) return `${yi}年${mi}月${di}日`;
-        if (!h || !min) return '';
-
-        const hi = Number(h);
-        const mini = Number(min);
-        if (!Number.isFinite(hi) || !Number.isFinite(mini)) return '';
-        if (hi < 0 || hi > 23 || mini < 0 || mini > 59) return '';
-
-        const ampm = hi >= 12 ? '下午' : '上午';
-        const hour12 = hi % 12 === 0 ? 12 : hi % 12;
-        const mm = String(mini).padStart(2, '0');
-        return `${ampm} ${hour12}:${mm} · ${yi}年${mi}月${di}日`;
-    };
+    const manualTimeText = collectTimeFromFields(timeFields);
 
     const tweet = {
         id: Date.now(),
@@ -2204,16 +2436,20 @@ function submitComposeTweet() {
             handle: account?.handle || '@new_user',
             avatar: account?.avatar || '',
             verified: !!account?.verified,
-            accountId: account?.id || null
+            accountId: account?.id || null,
+            avatarLinked: true
         },
         content,
         media: null,
-        time: buildManualTimeText() || formatDateYMD(new Date()),
+        time: manualTimeText || formatDateYMD(new Date()),
         views: '0',
         stats: { comments: 0, retweets: 0, likes: 0, bookmarks: 0 },
         translation: transToggleBtn?.classList.contains('active') ? { text: transText?.value || '', source: '中文', visible: true } : null,
         replies: []
     };
+    if (composeDraftMediaIds.length) {
+        setTweetMediaImages(tweet, composeDraftMediaIds);
+    }
 
     currentData.unshift(tweet);
     saveData(currentData);
@@ -2222,16 +2458,16 @@ function submitComposeTweet() {
         contentInput.textContent = t('composePlaceholder');
         contentInput.classList.add('is-placeholder');
     }
-    if (yearInput) yearInput.value = '';
-    if (monthInput) monthInput.value = '';
-    if (dayInput) dayInput.value = '';
-    if (hourInput) hourInput.value = '';
-    if (minuteInput) minuteInput.value = '';
+    timeFields?.querySelectorAll('.compose-time-part').forEach(input => {
+        input.value = '';
+    });
     if (transToggleBtn) transToggleBtn.classList.remove('active');
     if (transText) {
         transText.value = '';
         transText.style.display = 'none';
     }
+    composeDraftMediaIds = [];
+    renderComposeMediaPreview();
 
     updateComposeSubmitState();
     renderTimeline();
@@ -2240,30 +2476,44 @@ function submitComposeTweet() {
 function submitInlineReply(tweetId) {
     const input = document.querySelector(`.reply-input[data-tweet-id="${tweetId}"]`);
     const select = document.querySelector(`.reply-account-select[data-tweet-id="${tweetId}"]`);
+    const controls = document.querySelector(`.reply-compose-controls[data-tweet-id="${tweetId}"]:not([data-parent-reply-id])`);
     if (!input) return;
 
     const content = input.value.trim();
-    if (!content) return;
+    const draft = getReplyDraft(tweetId, null);
+    if (!content && !draft.mediaIds.length) return;
 
     const accountId = select?.value || getComposeAccountId();
-    addNewReply(tweetId, content, accountId);
+    const timeText = collectTimeFromFields(controls);
+    addNewReply(tweetId, content, accountId, { time: timeText, mediaIds: draft.mediaIds });
+    clearReplyDraft(tweetId, null);
     input.value = '';
+    controls?.querySelectorAll('.compose-time-part').forEach(field => {
+        field.value = '';
+    });
     input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function submitNestedReply(tweetId, parentReplyId) {
     const input = document.querySelector(`.nested-reply-input[data-tweet-id="${tweetId}"][data-parent-reply-id="${parentReplyId}"]`);
+    const controls = document.querySelector(`.reply-compose-controls[data-tweet-id="${tweetId}"][data-parent-reply-id="${parentReplyId}"]`);
     if (!input) return;
 
     const content = input.value.trim();
-    if (!content) return;
+    const draft = getReplyDraft(tweetId, parentReplyId);
+    if (!content && !draft.mediaIds.length) return;
 
-    addNestedReply(tweetId, parentReplyId, content);
+    const timeText = collectTimeFromFields(controls);
+    addNestedReply(tweetId, parentReplyId, content, null, { time: timeText, mediaIds: draft.mediaIds });
+    clearReplyDraft(tweetId, parentReplyId);
     input.value = '';
+    controls?.querySelectorAll('.compose-time-part').forEach(field => {
+        field.value = '';
+    });
     input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-function addNewReply(tweetId, content = '请编辑回复内容...', forcedAccountId = null) {
+function addNewReply(tweetId, content = '请编辑回复内容...', forcedAccountId = null, options = null) {
     const tweet = currentData.find(t => t.id === tweetId);
     if (!tweet) return;
 
@@ -2277,14 +2527,18 @@ function addNewReply(tweetId, content = '请编辑回复内容...', forcedAccoun
             handle: account?.handle || '@reply_user',
             avatar: account?.avatar || '',
             verified: !!account?.verified,
-            accountId: account?.id || null
+            accountId: account?.id || null,
+            avatarLinked: true
         },
         content,
-        time: formatDateYMD(new Date()),
+        time: options?.time || formatDateYMD(new Date()),
         translation: null,
         stats: { comments: 0, retweets: 0, likes: 0, views: 0 },
         replies: []
     };
+    if (Array.isArray(options?.mediaIds) && options.mediaIds.length) {
+        setTweetMediaImages(reply, options.mediaIds);
+    }
 
     tweet.replies = tweet.replies || [];
     tweet.replies.unshift(reply);
@@ -2292,7 +2546,7 @@ function addNewReply(tweetId, content = '请编辑回复内容...', forcedAccoun
     renderTweetDetail(tweetId);
 }
 
-function addNestedReply(tweetId, parentReplyId, content, forcedAccountId = null) {
+function addNestedReply(tweetId, parentReplyId, content, forcedAccountId = null, options = null) {
     const tweet = currentData.find(t => t.id === tweetId);
     if (!tweet) return;
 
@@ -2309,14 +2563,18 @@ function addNestedReply(tweetId, parentReplyId, content, forcedAccountId = null)
             handle: account?.handle || '@reply_user',
             avatar: account?.avatar || '',
             verified: !!account?.verified,
-            accountId: account?.id || null
+            accountId: account?.id || null,
+            avatarLinked: true
         },
         content,
-        time: formatDateYMD(new Date()),
+        time: options?.time || formatDateYMD(new Date()),
         translation: null,
         stats: { comments: 0, retweets: 0, likes: 0, views: 0 },
         replies: []
     };
+    if (Array.isArray(options?.mediaIds) && options.mediaIds.length) {
+        setTweetMediaImages(reply, options.mediaIds);
+    }
 
     parent.replies = parent.replies || [];
     parent.replies.unshift(reply);
@@ -2490,7 +2748,10 @@ function applyAccountChangesToTweets(account) {
         if (tw.user?.accountId === account.id || tw.user?.handle === account.handle) {
             tw.user.name = account.name;
             tw.user.handle = account.handle;
-            tw.user.avatar = account.avatar || '';
+            if (shouldSyncAvatarFromAccount(tw.user)) {
+                tw.user.avatar = account.avatar || '';
+                tw.user.avatarLinked = true;
+            }
             tw.user.verified = !!account.verified;
             tw.user.accountId = account.id;
         }
@@ -2498,7 +2759,10 @@ function applyAccountChangesToTweets(account) {
             if (r.user?.accountId === account.id || r.user?.handle === account.handle) {
                 r.user.name = account.name;
                 r.user.handle = account.handle;
-                r.user.avatar = account.avatar || '';
+                if (shouldSyncAvatarFromAccount(r.user)) {
+                    r.user.avatar = account.avatar || '';
+                    r.user.avatarLinked = true;
+                }
                 r.user.verified = !!account.verified;
                 r.user.accountId = account.id;
             }
@@ -2676,7 +2940,7 @@ renderTweetDetail = ((orig) => function (tweetId) {
 if (!window.__v3EventsBound) {
     window.__v3EventsBound = true;
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', async (e) => {
         const viewerSwitcherBtn = e.target.closest('.user-profile .more-icon');
         if (viewerSwitcherBtn) {
             e.preventDefault();
@@ -2758,6 +3022,56 @@ if (!window.__v3EventsBound) {
 
         if (!e.target.closest('.related-sort')) {
             closeRelatedSortMenus();
+        }
+
+        const composeMediaRemoveBtn = e.target.closest('.composer-media-remove-btn[data-media-index]');
+        if (composeMediaRemoveBtn && !composeMediaRemoveBtn.classList.contains('reply-media-remove-btn')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const mediaIndex = parseInt(composeMediaRemoveBtn.dataset.mediaIndex, 10);
+            if (Number.isNaN(mediaIndex)) return;
+            composeDraftMediaIds.splice(mediaIndex, 1);
+            renderComposeMediaPreview();
+            updateComposeSubmitState();
+            return;
+        }
+
+        const replyMediaUploadBtn = e.target.closest('.reply-media-upload-btn[data-tweet-id]');
+        if (replyMediaUploadBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (appMode === 'view') return;
+
+            const tweetId = parseInt(replyMediaUploadBtn.dataset.tweetId, 10);
+            const parentReplyId = replyMediaUploadBtn.dataset.parentReplyId
+                ? parseInt(replyMediaUploadBtn.dataset.parentReplyId, 10)
+                : null;
+            const draft = getReplyDraft(tweetId, Number.isNaN(parentReplyId) ? null : parentReplyId);
+            const remain = Math.max(0, 4 - draft.mediaIds.length);
+            if (remain <= 0) return;
+
+            const ids = await pickImagesAndStore(remain);
+            if (!ids.length) return;
+            draft.mediaIds = [...draft.mediaIds, ...ids].slice(0, 4);
+            renderReplyMediaPreview(tweetId, Number.isNaN(parentReplyId) ? null : parentReplyId);
+            return;
+        }
+
+        const replyMediaRemoveBtn = e.target.closest('.reply-media-remove-btn[data-tweet-id][data-media-index]');
+        if (replyMediaRemoveBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const tweetId = parseInt(replyMediaRemoveBtn.dataset.tweetId, 10);
+            const mediaIndex = parseInt(replyMediaRemoveBtn.dataset.mediaIndex, 10);
+            const parentReplyId = replyMediaRemoveBtn.dataset.parentReplyId
+                ? parseInt(replyMediaRemoveBtn.dataset.parentReplyId, 10)
+                : null;
+            if (Number.isNaN(tweetId) || Number.isNaN(mediaIndex)) return;
+            const keyParent = Number.isNaN(parentReplyId) ? null : parentReplyId;
+            const draft = getReplyDraft(tweetId, keyParent);
+            draft.mediaIds.splice(mediaIndex, 1);
+            renderReplyMediaPreview(tweetId, keyParent);
+            return;
         }
 
         const nestedToggleBtn = e.target.closest('.reply-thread-toggle-btn[data-action="toggle-nested-reply"][data-tweet-id][data-reply-id]');
