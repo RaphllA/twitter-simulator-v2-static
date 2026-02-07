@@ -1,7 +1,7 @@
 // Service Worker cache is independent from IndexedDB/localStorage app data.
 // Bump CACHE_VERSION on every release to ensure users receive fresh assets.
 const CACHE_PREFIX = 'twitter-simulator-static';
-const CACHE_VERSION = 'v4'; // Bump per release, e.g. v5 / 2026-02-07
+const CACHE_VERSION = 'v5'; // Bump per release, e.g. v6 / 2026-02-07
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [

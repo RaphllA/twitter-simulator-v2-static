@@ -540,7 +540,7 @@ function createTweetCard(tweet, isDetail = false) {
             ? `<div class="tweet-pin-label">${getLocale() === 'ja-JP' ? '固定表示' : '置顶推文'}</div>`
             : '';
         const guideHideBtnHtml = tweet.isGuide
-            ? `<button class="guide-hide-btn editor-only" type="button" data-tweet-id="${tweet.id}">${getLocale() === 'ja-JP' ? 'この案内を隠す' : '隐藏本教程'}</button>`
+            ? `<button class="guide-hide-btn" type="button" data-tweet-id="${tweet.id}">${getLocale() === 'ja-JP' ? 'この案内を隠す' : '隐藏本教程'}</button>`
             : '';
         card.innerHTML = `
             <button class="delete-btn" onclick="deleteTweet(${tweet.id}); event.stopPropagation();">×</button>
