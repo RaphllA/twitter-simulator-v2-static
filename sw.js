@@ -1,7 +1,7 @@
 // Service Worker cache is independent from IndexedDB/localStorage app data.
 // Bump CACHE_VERSION on every release to ensure users receive fresh assets.
 const CACHE_PREFIX = 'twitter-simulator-static';
-const CACHE_VERSION = 'v2'; // TODO: bump per release, e.g. v3 / 2026-02-07
+const CACHE_VERSION = 'v3'; // TODO: bump per release, e.g. v4 / 2026-02-07
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -12,8 +12,7 @@ const PRECACHE_URLS = [
   './js/image-store.js',
   './js/app.js',
   './manifest.webmanifest',
-  './assets/icon.svg',
-  './HOW_TO_USE.md'
+  './assets/icon.svg'
 ];
 
 async function precache() {
