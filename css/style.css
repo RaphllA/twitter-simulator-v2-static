@@ -1700,10 +1700,6 @@ button {
     background: rgba(15, 20, 25, 0.82);
     font-size: 12px;
     z-index: 10;
-    display: none;
-}
-
-.tweet-card:hover .guide-hide-btn {
     display: inline-flex;
 }
 
