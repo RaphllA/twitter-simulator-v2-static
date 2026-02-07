@@ -11,7 +11,7 @@ const ImageStore = {
     // Initialize Database
     init() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(this.dbName, 1);
+            const request = indexedDB.open(this.dbName, 2);
 
             request.onerror = (event) => {
                 console.error("IndexedDB error:", event.target.error);
@@ -28,6 +28,9 @@ const ImageStore = {
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains(this.storeName)) {
                     db.createObjectStore(this.storeName);
+                }
+                if (!db.objectStoreNames.contains('appState')) {
+                    db.createObjectStore('appState');
                 }
             };
         });

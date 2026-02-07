@@ -86,6 +86,9 @@ function toggleRightSidebarDrawer() {
 document.addEventListener('DOMContentLoaded', async () => {
     // 初始化 IndexedDB
     await ImageStore.init();
+    if (window.ensureAppStateReady) {
+        await window.ensureAppStateReady();
+    }
 
     // 迁移旧数据（如果有 base64 图片在 localStorage 中）
     await migrateOldImages();
@@ -2947,7 +2950,11 @@ if (!window.__v3EventsBound) {
 window.toggleAppMode = toggleAppMode;
 window.exportHtmlSnapshot = exportHtmlSnapshot;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    if (window.ensureAppStateReady) {
+        await window.ensureAppStateReady();
+    }
+
     const searchInput = document.querySelector('.search-box input');
     if (searchInput) searchInput.value = '';
     timelineSearchQuery = '';

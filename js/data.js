@@ -164,11 +164,22 @@ const tweetsData = [
     }
 ];
 
-// 智能合并数据：保留用户添加的推文，同时更新默认推文的内容
-const APP_STATE_KEY = 'twitter-simulator-state';
-const LEGACY_TWEETS_KEY = 'twitter-simulator-data';
-const LEGACY_VERSION_KEY = 'twitter-simulator-version';
+// 主状态使用 IndexedDB 存储，仅保留 locale/sort 在 localStorage
+const APP_DB_NAME = 'TwitterSimulatorDB';
+const APP_DB_VERSION = 2;
+const APP_STATE_STORE = 'appState';
+const APP_STATE_RECORD_KEY = 'current';
+const LEGACY_APP_STATE_KEY = 'twitter-simulator-state';
+const LEGACY_APP_STATE_COMPAT_KEYS = [
+    'twitter-simulator-state',
+    'twitter-simulator-data',
+    'twitter-simulator-version'
+];
+
 let unifiedAppState = null;
+let appStateDBPromise = null;
+let appStateReadyPromise = null;
+let persistQueue = Promise.resolve();
 
 function cloneDeep(obj) {
     return JSON.parse(JSON.stringify(obj));
@@ -273,31 +284,7 @@ function getDefaultState() {
     };
 }
 
-function loadUnifiedState() {
-    const defaults = getDefaultState();
-    let savedState = null;
-
-    try {
-        const rawState = localStorage.getItem(APP_STATE_KEY);
-        if (rawState) savedState = JSON.parse(rawState);
-    } catch (e) {
-        console.error('Failed to parse app state:', e);
-    }
-
-    if (!savedState) {
-        try {
-            const legacyTweets = localStorage.getItem(LEGACY_TWEETS_KEY);
-            if (legacyTweets) {
-                savedState = {
-                    ...defaults,
-                    tweets: JSON.parse(legacyTweets)
-                };
-            }
-        } catch (e) {
-            console.error('Failed to parse legacy tweets:', e);
-        }
-    }
-
+function buildNormalizedState(defaults, savedState) {
     const savedTweets = savedState && Array.isArray(savedState.tweets) ? savedState.tweets : [];
     const mergedTweets = mergeTweets(defaults.tweets, savedTweets);
     const baseAccounts = Array.isArray(defaults.accounts) ? defaults.accounts : [];
@@ -307,7 +294,7 @@ function loadUnifiedState() {
     );
     const fallbackViewerId = mergedAccounts[0]?.id || null;
 
-    const state = {
+    return {
         dataVersion: DATA_VERSION,
         tweets: mergedTweets,
         accounts: mergedAccounts,
@@ -325,35 +312,143 @@ function loadUnifiedState() {
             composeAuthorId: savedState?.ui?.composeAuthorId || savedState?.ui?.defaultAuthorId || fallbackViewerId
         }
     };
+}
+
+function clearLegacyAppStateKeys() {
+    for (const key of LEGACY_APP_STATE_COMPAT_KEYS) {
+        localStorage.removeItem(key);
+    }
+}
+
+function readLegacyStateFromLocalStorage() {
+    try {
+        const raw = localStorage.getItem(LEGACY_APP_STATE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (e) {
+        console.error('Failed to parse legacy app state:', e);
+        return null;
+    }
+}
+
+function openAppStateDB() {
+    if (appStateDBPromise) return appStateDBPromise;
+
+    appStateDBPromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open(APP_DB_NAME, APP_DB_VERSION);
+
+        request.onerror = (event) => {
+            console.error('Failed to open app state DB:', event.target.error);
+            reject(event.target.error);
+        };
+
+        request.onsuccess = (event) => {
+            resolve(event.target.result);
+        };
+
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('images')) {
+                db.createObjectStore('images');
+            }
+            if (!db.objectStoreNames.contains(APP_STATE_STORE)) {
+                db.createObjectStore(APP_STATE_STORE);
+            }
+        };
+    });
+
+    return appStateDBPromise;
+}
+
+async function readPersistedState() {
+    const db = await openAppStateDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([APP_STATE_STORE], 'readonly');
+        const store = tx.objectStore(APP_STATE_STORE);
+        const request = store.get(APP_STATE_RECORD_KEY);
+
+        request.onsuccess = (event) => resolve(event.target.result || null);
+        request.onerror = (event) => reject(event.target.error);
+    });
+}
+
+async function writePersistedState(state) {
+    const db = await openAppStateDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([APP_STATE_STORE], 'readwrite');
+        const store = tx.objectStore(APP_STATE_STORE);
+        const request = store.put(cloneDeep(state), APP_STATE_RECORD_KEY);
+
+        request.onsuccess = () => resolve();
+        request.onerror = (event) => reject(event.target.error);
+    });
+}
+
+function scheduleStatePersist(state) {
+    const snapshot = cloneDeep(state);
+    persistQueue = persistQueue
+        .then(() => writePersistedState(snapshot))
+        .catch((err) => {
+            console.error('Failed to persist app state:', err);
+        });
+    return persistQueue;
+}
+
+async function loadUnifiedState() {
+    const defaults = getDefaultState();
+    let savedState = null;
+    let hasLegacyState = false;
+
+    try {
+        savedState = await readPersistedState();
+    } catch (e) {
+        console.error('Failed to read persisted app state:', e);
+    }
+
+    if (!savedState) {
+        const legacy = readLegacyStateFromLocalStorage();
+        if (legacy) {
+            savedState = legacy;
+            hasLegacyState = true;
+        }
+    }
+
+    const state = buildNormalizedState(defaults, savedState);
 
     unifiedAppState = state;
-    saveUnifiedState(state);
-    localStorage.setItem(LEGACY_VERSION_KEY, DATA_VERSION.toString());
+    await scheduleStatePersist(state);
+    if (hasLegacyState) {
+        clearLegacyAppStateKeys();
+    }
     return state;
 }
 
 function saveUnifiedState(state) {
     unifiedAppState = state;
-    localStorage.setItem(APP_STATE_KEY, JSON.stringify(state));
+    currentData = cloneDeep(state.tweets);
+    scheduleStatePersist(state);
+    return cloneDeep(state);
 }
 
 function loadData() {
-    return loadUnifiedState().tweets;
+    const state = unifiedAppState || getDefaultState();
+    return cloneDeep(state.tweets);
 }
 
 function saveData(data) {
-    const state = unifiedAppState || loadUnifiedState();
+    const state = unifiedAppState || getDefaultState();
     state.tweets = cloneDeep(data);
     saveUnifiedState(state);
 }
 
 function getAccounts() {
-    const state = unifiedAppState || loadUnifiedState();
+    const state = unifiedAppState || getDefaultState();
     return cloneDeep(state.accounts);
 }
 
 function upsertAccount(account) {
-    const state = unifiedAppState || loadUnifiedState();
+    const state = unifiedAppState || getDefaultState();
     const idx = state.accounts.findIndex(item => item.id === account.id);
     const payload = {
         ...account,
@@ -366,41 +461,53 @@ function upsertAccount(account) {
 }
 
 function setUITextField(field, value) {
-    const state = unifiedAppState || loadUnifiedState();
+    const state = unifiedAppState || getDefaultState();
     state.ui.textFields[field] = value;
     saveUnifiedState(state);
 }
 
 function setUIAvatarField(field, value) {
-    const state = unifiedAppState || loadUnifiedState();
+    const state = unifiedAppState || getDefaultState();
     state.ui.avatarFields[field] = value;
     saveUnifiedState(state);
 }
 
 function getUIState() {
-    const state = unifiedAppState || loadUnifiedState();
+    const state = unifiedAppState || getDefaultState();
     return cloneDeep(state.ui);
 }
 
 function setDefaultAuthorId(accountId) {
-    const state = unifiedAppState || loadUnifiedState();
+    const state = unifiedAppState || getDefaultState();
     state.ui.defaultAuthorId = accountId || null;
     saveUnifiedState(state);
 }
 
 function setComposeAuthorId(accountId) {
-    const state = unifiedAppState || loadUnifiedState();
+    const state = unifiedAppState || getDefaultState();
     state.ui.composeAuthorId = accountId || null;
     saveUnifiedState(state);
 }
 
 function setAppMode(mode) {
-    const state = unifiedAppState || loadUnifiedState();
+    const state = unifiedAppState || getDefaultState();
     state.ui.mode = mode === 'view' ? 'view' : 'edit';
     saveUnifiedState(state);
 }
 
-currentData = loadData();
+currentData = cloneDeep(getDefaultState().tweets);
+appStateReadyPromise = loadUnifiedState()
+    .then((state) => {
+        currentData = cloneDeep(state.tweets);
+        return cloneDeep(state);
+    })
+    .catch((err) => {
+        console.error('Failed to initialize app state, fallback to defaults:', err);
+        const fallback = getDefaultState();
+        unifiedAppState = fallback;
+        currentData = cloneDeep(fallback.tweets);
+        return cloneDeep(fallback);
+    });
 
 window.getAccounts = getAccounts;
 window.upsertAccount = upsertAccount;
@@ -411,9 +518,10 @@ window.setDefaultAuthorId = setDefaultAuthorId;
 window.setComposeAuthorId = setComposeAuthorId;
 window.setAppMode = setAppMode;
 window.buildAccountIdByHandle = buildAccountIdByHandle;
+window.ensureAppStateReady = () => appStateReadyPromise || Promise.resolve(cloneDeep(unifiedAppState || getDefaultState()));
 
 function removeAccount(accountId) {
-    const state = unifiedAppState || loadUnifiedState();
+    const state = unifiedAppState || getDefaultState();
     state.accounts = state.accounts.filter(account => account.id !== accountId);
     const fallbackId = state.accounts[0]?.id || null;
     if (state.ui.defaultAuthorId === accountId) {
@@ -435,8 +543,14 @@ function replaceProjectState(payload) {
         accounts: Array.isArray(payload?.accounts) ? cloneDeep(payload.accounts) : [],
         ui: {
             mode: payload?.ui?.mode === 'view' ? 'view' : 'edit',
-            textFields: { ...(payload?.ui?.textFields || {}) },
-            avatarFields: { ...(payload?.ui?.avatarFields || {}) },
+            textFields: {
+                ...(defaults.ui?.textFields || {}),
+                ...(payload?.ui?.textFields || {})
+            },
+            avatarFields: {
+                ...(defaults.ui?.avatarFields || {}),
+                ...(payload?.ui?.avatarFields || {})
+            },
             defaultAuthorId: payload?.ui?.defaultAuthorId || null,
             composeAuthorId: payload?.ui?.composeAuthorId || payload?.ui?.defaultAuthorId || null
         }
