@@ -28,6 +28,55 @@ let cropBoxState = { x: 0, y: 0, width: 0, height: 0 };
 let cropPointerState = null;
 const TIMELINE_SORT_KEY = 'tukuyomi-timeline-sort';
 
+// ========================================
+// Mobile overlays (right drawer + tools)
+// ========================================
+
+function setSidebarToolsOpen(open) {
+    const sidebar = document.querySelector('.left-sidebar');
+    if (!sidebar) return;
+    const next = !!open;
+    sidebar.classList.toggle('tools-open', next);
+    document.body.classList.toggle('sidebar-tools-open', next);
+}
+
+function closeSidebarTools() {
+    setSidebarToolsOpen(false);
+}
+
+function toggleSidebarTools() {
+    const sidebar = document.querySelector('.left-sidebar');
+    const next = !(sidebar && sidebar.classList.contains('tools-open'));
+    setSidebarToolsOpen(next);
+    if (next) closeRightSidebarDrawer();
+}
+
+function isRightSidebarDrawerEnabled() {
+    try {
+        return window.matchMedia && window.matchMedia('(max-width: 1024px)').matches;
+    } catch {
+        return false;
+    }
+}
+
+function setRightSidebarDrawerOpen(open) {
+    if (!isRightSidebarDrawerEnabled()) {
+        document.body.classList.remove('mobile-drawer-open');
+        return;
+    }
+    document.body.classList.toggle('mobile-drawer-open', !!open);
+}
+
+function closeRightSidebarDrawer() {
+    setRightSidebarDrawerOpen(false);
+}
+
+function toggleRightSidebarDrawer() {
+    const next = !document.body.classList.contains('mobile-drawer-open');
+    setRightSidebarDrawerOpen(next);
+    if (next) closeSidebarTools();
+}
+
 
 
 // ========================================
@@ -737,6 +786,8 @@ function setupEventListeners() {
         if (e.key === 'Escape') {
             closeTextModal();
             closeImageModal();
+            closeSidebarTools();
+            closeRightSidebarDrawer();
         }
     });
 
@@ -758,6 +809,28 @@ function setupEventListeners() {
         imageInput.addEventListener('change', handleImageInputChange);
     }
     setupCropBoxInteractions();
+
+    const exploreNav = document.getElementById('nav-explore');
+    if (exploreNav && !exploreNav.dataset.boundDrawer) {
+        exploreNav.dataset.boundDrawer = '1';
+        exploreNav.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleRightSidebarDrawer();
+        });
+    }
+
+    const rightBackdrop = document.getElementById('right-sidebar-backdrop');
+    if (rightBackdrop && !rightBackdrop.dataset.boundClose) {
+        rightBackdrop.dataset.boundClose = '1';
+        rightBackdrop.addEventListener('click', () => closeRightSidebarDrawer());
+    }
+
+    const toolsBackdrop = document.getElementById('sidebar-tools-backdrop');
+    if (toolsBackdrop && !toolsBackdrop.dataset.boundClose) {
+        toolsBackdrop.dataset.boundClose = '1';
+        toolsBackdrop.addEventListener('click', () => closeSidebarTools());
+    }
 
     const searchInput = document.querySelector('.search-box input');
     if (searchInput) {
@@ -811,7 +884,7 @@ function getMediaLayoutClass(imageCount) {
 function startTextEdit(element) {
     editingElement = element;
     editingField = element.dataset.field;
-    editingTweetId = parseInt(element.dataset.tweetId);
+    editingTweetId = element.dataset.tweetId ? parseInt(element.dataset.tweetId, 10) : null;
     editingReplyId = element.dataset.replyId ? parseInt(element.dataset.replyId) : null;
 
     const modal = document.getElementById('text-modal');
@@ -836,7 +909,12 @@ function confirmText() {
     const newValue = input.value.trim();
 
     if (editingElement && editingField) {
-        updateData(editingTweetId, editingReplyId, editingField, newValue);
+        if (editingTweetId === null) {
+            editingElement.textContent = newValue;
+            setUITextField(editingField, newValue);
+        } else {
+            updateData(editingTweetId, editingReplyId, editingField, newValue);
+        }
     }
 
     closeTextModal();
@@ -855,14 +933,19 @@ function confirmText() {
 
 function startNumberEdit(element) {
     const field = element.dataset.field;
-    const tweetId = parseInt(element.dataset.tweetId);
+    const tweetId = element.dataset.tweetId ? parseInt(element.dataset.tweetId, 10) : null;
     const replyId = element.dataset.replyId ? parseInt(element.dataset.replyId) : null;
 
     const currentValue = element.textContent.trim();
     const newValue = prompt(`编辑 ${getFieldLabel(field)}:`, currentValue);
 
     if (newValue !== null) {
-        updateData(tweetId, replyId, field, newValue);
+        if (tweetId === null) {
+            element.textContent = newValue;
+            setUITextField(field, newValue);
+        } else {
+            updateData(tweetId, replyId, field, newValue);
+        }
 
         // 刷新视图
         if (currentView === 'timeline') {
@@ -1265,6 +1348,7 @@ async function confirmImage() {
             }
         } else if (editingTweetId === null) {
             renderUIAvatar(editingElement, processedImageIds[0]);
+            setUIAvatarField(editingField, processedImageIds[0]);
             loadAsyncImages(document);
         } else if (editingField === 'avatar' || editingField.includes('avatar')) {
             updateData(editingTweetId, editingReplyId, 'avatar', processedImageIds[0]);
@@ -1745,9 +1829,11 @@ function applyLocale() {
     setText('.timeline-tabs .tab:last-child', t('following'));
     setText('.left-sidebar .post-btn', t('post'));
     setText('.compose-submit-btn', t('post'));
+    setText('#sidebar-viewer-label', t('viewer'));
     setText('#account-add-btn', t('addAccount'));
     setText('#sidebar-import-label', t('importData'));
     setText('#sidebar-export-label', t('exportData'));
+    setText('#sidebar-export-html-label', t('exportHtml'));
     setText('#sidebar-mode-label', appMode === 'view' ? t('modeView') : t('modeEdit'));
     setText('#sidebar-locale-label', t('language'));
     setText('#sidebar-sort-label', getTimelineSortMode() === 'date' ? t('sortByDate') : t('sortByPost'));
@@ -1803,7 +1889,7 @@ function ensureTopTools() {
         moreNav.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            sidebar.classList.toggle('tools-open');
+            toggleSidebarTools();
         });
     }
 
@@ -1812,6 +1898,10 @@ function ensureTopTools() {
         tools.id = 'sidebar-tools';
         tools.className = 'sidebar-tools';
         tools.innerHTML = `
+            <button id="sidebar-viewer-btn" class="sidebar-tool-btn" type="button">
+                <svg viewBox="0 0 24 24"><path d="M5.651 19h12.698c-.337-1.8-1.023-3.21-1.945-4.19C15.318 13.65 13.838 13 12 13s-3.317.65-4.404 1.81c-.922.98-1.608 2.39-1.945 4.19zm.486-5.56C7.627 11.85 9.648 11 12 11s4.373.85 5.863 2.44c1.477 1.58 2.366 3.8 2.632 6.46l.11 1.1H3.395l.11-1.1c.266-2.66 1.155-4.88 2.632-6.46zM12 4c-1.105 0-2 .9-2 2s.895 2 2 2 2-.9 2-2-.895-2-2-2zM8 6c0-2.21 1.791-4 4-4s4 1.79 4 4-1.791 4-4 4-4-1.79-4-4z"/></svg>
+                <span id="sidebar-viewer-label"></span>
+            </button>
             <button id="sidebar-sort-btn" class="sidebar-tool-btn" type="button">
                 <svg viewBox="0 0 24 24"><path d="M3.75 6.5h10.5v2H3.75v-2zm0 4.5h16.5v2H3.75v-2zm0 4.5h7.5v2h-7.5v-2z"/></svg>
                 <span id="sidebar-sort-label"></span>
@@ -1827,6 +1917,10 @@ function ensureTopTools() {
             <button id="sidebar-export-btn" class="sidebar-tool-btn editor-only" type="button">
                 <svg viewBox="0 0 24 24"><path d="M12 2.59l5.7 5.7-1.41 1.42L13 6.41V16h-2V6.41l-3.3 3.3-1.41-1.42L12 2.59zM21 15l-.02 3.51c0 1.38-1.12 2.49-2.5 2.49H5.5C4.11 21 3 19.88 3 18.5V15h2v3.5c0 .28.22.5.5.5h12.98c.28 0 .5-.22.5-.5L19 15h2z"/></svg>
                 <span id="sidebar-export-label"></span>
+            </button>
+            <button id="sidebar-export-html-btn" class="sidebar-tool-btn editor-only" type="button">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+                <span id="sidebar-export-html-label"></span>
             </button>
             <div class="sidebar-tool-row">
                 <span id="sidebar-locale-label"></span>
@@ -1844,6 +1938,28 @@ function ensureTopTools() {
         } else if (tools && tools.nextElementSibling !== postBtn) {
             navContent.insertBefore(tools, postBtn);
         }
+    }
+
+    const tools = document.getElementById('sidebar-tools');
+    if (tools && !tools.dataset.boundAutoClose) {
+        tools.dataset.boundAutoClose = '1';
+        tools.addEventListener('click', (e) => {
+            const btn = e.target.closest('.sidebar-tool-btn');
+            if (!btn) return;
+            if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+                closeSidebarTools();
+            }
+        });
+    }
+
+    const viewerBtn = document.getElementById('sidebar-viewer-btn');
+    if (viewerBtn && !viewerBtn.dataset.bound) {
+        viewerBtn.dataset.bound = '1';
+        viewerBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openViewerSwitcher(viewerBtn);
+        });
     }
 
     const modeBtn = document.getElementById('mode-toggle-btn');
@@ -1868,6 +1984,12 @@ function ensureTopTools() {
     if (exportBtn && !exportBtn.dataset.bound) {
         exportBtn.dataset.bound = '1';
         exportBtn.onclick = exportData;
+    }
+
+    const exportHtmlBtn = document.getElementById('sidebar-export-html-btn');
+    if (exportHtmlBtn && !exportHtmlBtn.dataset.bound) {
+        exportHtmlBtn.dataset.bound = '1';
+        exportHtmlBtn.onclick = exportHtmlSnapshot;
     }
 
     const sortBtn = document.getElementById('sidebar-sort-btn');
@@ -2398,6 +2520,28 @@ function renderUIAvatar(element, avatarRef) {
     }
 }
 
+function applyUIOverrides(root = document) {
+    const ui = getUIState();
+    const textFields = ui?.textFields && typeof ui.textFields === 'object' ? ui.textFields : {};
+    const avatarFields = ui?.avatarFields && typeof ui.avatarFields === 'object' ? ui.avatarFields : {};
+
+    root.querySelectorAll('[data-field]:not([data-tweet-id])').forEach(el => {
+        const key = el.dataset.field;
+        if (!key) return;
+
+        if (el.classList.contains('editable-avatar')) {
+            if (Object.prototype.hasOwnProperty.call(avatarFields, key)) {
+                renderUIAvatar(el, avatarFields[key] || '');
+            }
+            return;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(textFields, key)) {
+            el.textContent = textFields[key];
+        }
+    });
+}
+
 function exportHtmlSnapshot() {
     const payload = { tweets: currentData, accounts: getAccounts(), ui: getUIState(), locale: getLocale() };
     const safe = JSON.stringify(payload).replace(/</g, '\\u003c');
@@ -2466,6 +2610,7 @@ renderTimeline = ((orig) => function () {
     renderViewerProfile();
     applyMode(getUIState().mode || 'edit');
     applyLocale();
+    applyUIOverrides();
     loadAsyncImages(document);
 })(renderTimeline);
 
@@ -2477,6 +2622,7 @@ renderTweetDetail = ((orig) => function (tweetId) {
     renderViewerProfile();
     applyMode(getUIState().mode || 'edit');
     applyLocale();
+    applyUIOverrides();
     loadAsyncImages(document);
 })(renderTweetDetail);
 

@@ -2067,7 +2067,24 @@ button {
 
 @media (max-width: 768px) {
     .left-sidebar.tools-open .sidebar-tools {
-        display: none;
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        top: calc(56px + env(safe-area-inset-top, 0px));
+        margin: 0 auto;
+        max-width: 560px;
+        background: #0f1419;
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 10px 10px 12px;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+        z-index: 60;
+    }
+
+    .sidebar-tools {
+        margin: 0;
+        border: none;
+        padding: 0;
     }
 }
 
@@ -2549,7 +2566,19 @@ button {
     z-index: 39;
 }
 
+.sidebar-tools-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 59;
+}
+
 @media (max-width: 1024px) {
+    body.mobile-drawer-open {
+        overflow: hidden;
+    }
+
     .mobile-only {
         display: inline-flex;
     }
@@ -2572,6 +2601,16 @@ button {
     }
 
     body.mobile-drawer-open .right-sidebar-backdrop {
+        display: block;
+    }
+}
+
+@media (max-width: 768px) {
+    body.sidebar-tools-open {
+        overflow: hidden;
+    }
+
+    body.sidebar-tools-open .sidebar-tools-backdrop {
         display: block;
     }
 }
