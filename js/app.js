@@ -1693,7 +1693,10 @@ async function confirmImage() {
             updateData(editingTweetId, editingReplyId, 'avatar', processedImageIds[0]);
 
             const accountId = targetUser?.accountId || null;
-            const account = accountId ? getAccounts().find(a => a.id === accountId) : null;
+            const accounts = getAccounts();
+            // Default tweets may not have accountId. Fall back to matching by handle.
+            const account = (accountId ? accounts.find(a => a.id === accountId) : null)
+                || (targetUser?.handle ? accounts.find(a => a.handle === targetUser.handle) : null);
             if (account) {
                 const shouldSyncToAccount = !!document.getElementById('sync-account-avatar-option')?.checked;
                 if (shouldSyncToAccount) {
