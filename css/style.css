@@ -1922,16 +1922,17 @@ button {
    ======================================== */
 
 :root {
-    --x-column-center: 600px;
-    --x-column-right: 350px;
+    --x-column-left: 320px;
+    --x-column-center: 640px;
+    --x-column-right: 320px;
 }
 
 .app-container {
-    max-width: 1320px;
+    max-width: 1360px;
 }
 
 .left-sidebar {
-    width: 260px;
+    width: var(--x-column-left);
 }
 
 .main-content {
@@ -2418,7 +2419,7 @@ button {
 }
 @media (max-width: 1280px) {
     .main-content {
-        width: min(100%, 620px);
+        width: min(100%, 650px);
         min-width: 0;
     }
 }
